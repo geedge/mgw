@@ -7,10 +7,7 @@
 
 #include<linux/udp.h>
 
-#include"tun.h"
-#include"client_stat.h"
-
-extern struct global_stat_t global_stat;
+#include "tun.h"
 
 /**************************************************************************
  * tun_alloc:  create a tun fd,and set tun param .                        *
@@ -62,8 +59,6 @@ int read_from_tun(int tun_fd, char *recv_ip_pkts,size_t ip_pkt_len)
     }
     else
     {
-		global_stat.recv_ip_bytes += recv_ip_len;
-        global_stat.recv_ip_pkts ++;
         return recv_ip_len;
     }
 
@@ -99,8 +94,6 @@ int write_to_tun(int tun_fd, char *send_ip_pkts, int send_ip_len)
         }
         else
         {
-            global_stat.send_ip_bytes += cur_snd_ip_len;
-            global_stat.send_ip_pkts ++;
             return cur_snd_ip_len;
         }
 
