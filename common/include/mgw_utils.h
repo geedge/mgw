@@ -10,6 +10,9 @@
 #define likely(expr)    __builtin_expect((expr), 1)
 #define unlikely(expr)  __builtin_expect((expr), 0)
 
+#define ALLOC(type, number) ((type *)calloc(sizeof(type), number))
+#define	FREE(p)	{free(*p);*p=NULL;}
+
 #define MGW_LOG_ERROR(handler, fmt, ...)															\
 do { fprintf(stderr, fmt "\n" , ##__VA_ARGS__);														\
 	 MESA_handle_runtime_log(handler, RLOG_LV_FATAL, "mgw", fmt, ##__VA_ARGS__); } while(0)			

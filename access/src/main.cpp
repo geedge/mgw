@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <pthread.h>
 #include "MESA/MESA_prof_load.h"
 #include "MESA/MESA_handle_logger.h"
 #include "mgw_utils.h"
@@ -13,15 +14,27 @@ extern "C"
 {
 #endif
 
+struct htable_opt
+{
+    int mho_screen_print_ctrl;
+    int mho_thread_safe;
+    int mho_mutex_num;
+    int mho_hash_slot_size;
+    int mho_expire_time;
+}
+
 struct mgw_ctx
 {
     void* logger;
     const char *profile;
     Maat_feather_t Maat_feather;
+    struct htable_opt *_htable_opt;
+    struct vpn_monitor_ctx *_vpn_monitor_ctx;
 };
+
 struct mgw_ctx g_mgw_ctx;
 
-void wrapped_Maat_set_feather_opt(Maat_feather_t feather, enum MAAT_INIT_OPT type, const void* value, int size)
+static void wrapped_Maat_set_feather_opt(Maat_feather_t feather, enum MAAT_INIT_OPT type, const void* value, int size)
 {
     int rtn = Maat_set_feather_opt(feather, type, value, size);
     if(unlikely(rtn < 0))
@@ -31,13 +44,13 @@ void wrapped_Maat_set_feather_opt(Maat_feather_t feather, enum MAAT_INIT_OPT typ
     }
 }
 
-void Maat_init()
+static void Maat_init()
 {
     // load conf
     const char *section = "Maat";
     char table_info_path[MGW_PATH_MAX];
     int max_thread_num;
-    char Maat_redis_ip[MGW_STRING_MAX];
+    char Maat_redis_ip[MGW_SYMBOL_MAX];
     int Maat_redis_port;
     char stat_file_path[MGW_PATH_MAX];
     MESA_load_profile_string_def(g_mgw_ctx.profile, section, "table_info_path", table_info_path, sizeof(table_info_path), "./conf/table_info.conf");
@@ -71,7 +84,20 @@ void Maat_init()
     }
     g_mgw_ctx.Maat_feather = feather;
 }
-void mgw_init()
+
+static void htable_opt_init()
+{
+    struct htable_opt* _htable_opt = ALLOC(struct htable_opt, 1);
+    const char *section = "htable_opt";
+    MESA_load_profile_string_def(g_mgw_ctx.profile, section, "mho_screen_print_ctrl", _htable_opt->mho_screen_print_ctrl, sizeof(int), 0);
+    MESA_load_profile_string_def(g_mgw_ctx.profile, section, "mho_thread_safe", _htable_opt->_htable_opt.mho_thread_safe, sizeof(int), 1);
+    MESA_load_profile_string_def(g_mgw_ctx.profile, section, "mho_mutex_num", _htable_opt->_htable_opt.mho_mutex_num, sizeof(int), 16);
+    MESA_load_profile_string_def(g_mgw_ctx.profile, section, "mho_hash_slot_size", _htable_opt->_htable_opt.mho_hash_slot_size, sizeof(int), 16);
+    MESA_load_profile_string_def(g_mgw_ctx.profile, section, "mho_expire_time", _htable_opt->_htable_opt.mho_expire_time, sizeof(int), -1);
+    g_mgw_ctx._htable_opt = _htable_opt;
+}
+
+static void mgw_init()
 {
     g_mgw_ctx.profile = "./conf/mgw.conf";
 	const char *section = "global";
@@ -84,51 +110,35 @@ void mgw_init()
 		exit(EXIT_FAILURE);
 	}
     g_mgw_ctx.logger = logger;
+    htable_opt_init();
     Maat_init();
+    pthread_t thread_id;
+    int rtn = pthread_create(&thread_id, NULL, thread_vpn_monitor, NULL);
+    if(unlikely(rtn != 0))
+    {
+        MGW_LOG_ERROR(g_mgw_ctx.logger, "Failed at creating thread_vpn_monitor");
+        exit(EXIT_FAILURE);
+    }
 }
 
-void mgw_destroy()
+static void mgw_destroy()
 {
     MESA_destroy_runtime_log_handle(g_mgw_ctx.logger);
     Maat_burn_feather(g_mgw_ctx.Maat_feather);
 }
 
-#define	TEST_CMD_LINE_NUM	4
-void Maat_test_set_cmd_line(Maat_feather_t feather)
+static void mgw_run()
 {
-	const struct Maat_line_t *p_line[TEST_CMD_LINE_NUM];
-	struct Maat_line_t line_rule[TEST_CMD_LINE_NUM];
-	char table_line[TEST_CMD_LINE_NUM][128];
-	int ret=0,i=0;
-	memset(&line_rule,0,sizeof(line_rule));
-	for(i=0;i<TEST_CMD_LINE_NUM;i++)
-	{
-		line_rule[i].label_id=0;
-		line_rule[i].rule_id=(int)Maat_cmd_incrby(feather,"TEST_PLUG_SEQ", 1);
-		line_rule[i].table_name="QD_ENTRY_INFO";
-		snprintf(table_line[i],sizeof(table_line[i]),"1\t192.168.0.1\t%d\t1",100+i);
-		line_rule[i].table_line=table_line[i];
-		line_rule[i].expire_after=0;
-		p_line[i]=line_rule+i;
-	}
-	
-    /*
-	ret=Maat_cmd_set_lines(feather, p_line, TEST_CMD_LINE_NUM, MAAT_OP_ADD);
-	assert(ret>0);
-	for(i=0;i<TEST_CMD_LINE_NUM;i++)
-	{
-		line_rule[i].table_line=NULL;
-	}
-	ret=Maat_cmd_set_lines(feather, p_line,TEST_CMD_LINE_NUM, MAAT_OP_DEL);
-	assert(ret>0);
-    */
-	return;
+    while(1)
+    {
+        
+    }
 }
 
 int main(int argc, char* argv[])
 {
     mgw_init();
-    //Maat_test_set_cmd_line(g_mgw_ctx.Maat_feather);
+    mgw_run();
 }
 
 #ifdef __cplusplus
