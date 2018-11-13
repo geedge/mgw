@@ -3,10 +3,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
-#include "MESA/MESA_prof_load.h"
-#include "MESA/MESA_handle_logger.h"
-#include "MESA/Maat_rule.h"
-#include "MESA/Maat_command.h"
 #include "mgw_utils.h"
 
 
@@ -15,12 +11,6 @@ extern "C"
 {
 #endif
 
-struct mgw_ctx
-{
-    void* logger;
-    const char *profile;
-    Maat_feather_t Maat_feather;
-};
 struct mgw_ctx g_mgw_ctx;
 
 void wrapped_Maat_set_feather_opt(Maat_feather_t feather, enum MAAT_INIT_OPT type, const void* value, int size)

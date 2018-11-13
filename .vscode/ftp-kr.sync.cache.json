@@ -1,0 +1,174 @@
+{
+  "sftp://192.168.11.137:22@root": {
+    "root": {
+      "IPReuse": {
+        "mgw": {
+          "common": {
+            "include": {
+              "mgw_utils.h": {
+                "type": "-",
+                "size": 1669,
+                "lmtime": 1541749644647,
+                "modified": false
+              },
+              "tun.h": {
+                "type": "-",
+                "size": 294,
+                "lmtime": 1541750944509,
+                "modified": false
+              }
+            },
+            "CMakeLists.txt": {
+              "type": "-",
+              "size": 174,
+              "lmtime": 1541749907789,
+              "modified": false
+            },
+            "src": {
+              "mgw_utils.cpp": {
+                "type": "-",
+                "size": 2357,
+                "lmtime": 1541748400171,
+                "modified": false
+              },
+              "tun.cpp": {
+                "type": "-",
+                "size": 2742,
+                "lmtime": 1541750772819,
+                "modified": false
+              }
+            }
+          },
+          "CMakeLists.txt": {
+            "type": "-",
+            "size": 353,
+            "lmtime": 1540963722549,
+            "modified": false
+          },
+          "README.md": {
+            "type": "-",
+            "size": 26,
+            "lmtime": 1540888536383,
+            "modified": false
+          },
+          "access": {
+            "CMakeLists.txt": {
+              "type": "-",
+              "size": 1093,
+              "lmtime": 1541746572765,
+              "modified": false
+            },
+            "include": {
+              "vpn_monitor.h": {
+                "type": "-",
+                "size": 316,
+                "lmtime": 1541745105496,
+                "modified": false
+              },
+              "nat.cpp": {
+                "type": "-",
+                "size": 0,
+                "lmtime": 1541751728308,
+                "modified": false
+              },
+              "nat.h": {
+                "type": "-",
+                "size": 0,
+                "lmtime": 1541751736748,
+                "modified": false
+              }
+            },
+            "src": {
+              "main.cpp": {
+                "type": "-",
+                "size": 6385,
+                "lmtime": 1541751403568,
+                "modified": false
+              },
+              "tun.cpp": {
+                "type": "-",
+                "size": 2734,
+                "lmtime": 1541164401820,
+                "modified": false
+              },
+              "vpn_monitor.cpp": {
+                "type": "-",
+                "size": 8266,
+                "lmtime": 1541748000824,
+                "modified": false
+              },
+              "nat.cpp": {
+                "type": "-",
+                "size": 3068,
+                "lmtime": 1541771190090,
+                "modified": false
+              },
+              "ip_translator.cpp": {
+                "type": "-",
+                "size": 0,
+                "lmtime": 1541664138444,
+                "modified": false
+              },
+              "ip_manager.cpp": {
+                "type": "-",
+                "size": 0,
+                "lmtime": 1541751456565,
+                "modified": false
+              },
+              "ip_pool_mgr.cpp": {
+                "type": "-",
+                "size": 0,
+                "lmtime": 1541751709640,
+                "modified": false
+              }
+            },
+            "test": {
+              "test_maat_redis.cpp": {
+                "type": "-",
+                "size": 6241,
+                "lmtime": 1541320257970,
+                "modified": false
+              },
+              "test_tun.cpp": {
+                "type": "-",
+                "size": 3123,
+                "lmtime": 1541751177033,
+                "modified": false
+              }
+            }
+          },
+          "vendor": {
+            "CMakeLists.txt": {
+              "type": "-",
+              "size": 1741,
+              "lmtime": 1540969696627,
+              "modified": false
+            },
+            "maat-v2.3.3.tar.gz": {
+              "type": "-",
+              "size": 1920396,
+              "lmtime": 1540888536391,
+              "modified": false
+            }
+          },
+          "build": {},
+          "conf": {
+            "table_info.conf": {
+              "type": "-",
+              "size": 604,
+              "lmtime": 1541321983862,
+              "modified": false
+            },
+            "mgw.conf": {
+              "type": "-",
+              "size": 447,
+              "lmtime": 1541321983862,
+              "modified": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "$version": 1
+}
