@@ -27,13 +27,33 @@ void ip2user_htable_data_free_cb(void *data)
     FREE(&data);
 }
 
+static long ip2user_cb_to_del_key(void *data, const uchar *key, uint size, void *user_arg)
+{
+    unsigned char _key[MGW_SYMBOL_MAX];
+    memcpy((char *)_key, key, size);
+    _key[size] = '\0';
+    struct vpn_monitor_handle *handle = (struct vpn_monitor_handle *)user_arg;
+    if(data != NULL)
+    {
+        MGW_LOG_INFO(handle->logger, "MESA_htable: key existed, table is %s, key is %s", "ip2user_htable", _key);
+        int rtn = MESA_htable_del(handle->ip2user_htable, key, size, ip2user_htable_data_free_cb);
+        if(rtn != 0)
+        {
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: failed at del, errno is %d, table is %s, key is %s", rtn, "ip2user_htable", _key);
+            return HTABLE_QUERY_CB_FAILURE;
+        }
+        MGW_LOG_INFO(handle->logger, "MESA_htable: succeed at del, table is %s, key is %s", "ip2user_htable", _key);
+    }
+    return HTABLE_QUERY_CB_SUCCESS;
+}
+
 
 struct vpn_monitor_handle * vpn_monitor_init(void *args)
 {
     struct vpn_monitor_args *_args = (struct vpn_monitor_args *)args;
     struct vpn_monitor_handle *handle = ALLOC(struct vpn_monitor_handle, 1);
     handle->logger = _args->logger;
-    handle->ip2user_htable = _args->logger;
+    handle->ip2user_htable = _args->ip2user_htable;
     const char *profile = _args->profile;
     const char *section = "vpn_server";
     char hub_list_str[MGW_STRING_MAX];
@@ -73,32 +93,13 @@ struct vpn_monitor_handle * vpn_monitor_init(void *args)
         handle->hubs[handle->hub_num].dhcp_end_ip = _dhcp_end_ip;
         handle->hub_num ++;
     }
+    FREE(&args);
     return handle;
 }
 
 void * vpn_monitor_destroy(struct vpn_monitor_handle *handle)
 {
     FREE(&handle);
-}
-
-static long ip2user_cb_to_del_key(void *data, const uchar *key, uint size, void *user_arg)
-{
-    unsigned char _key[MGW_SYMBOL_MAX];
-    strncpy((char *)_key, (char *)key, size);
-    _key[size] = '\0';
-    struct vpn_monitor_handle *handle = (struct vpn_monitor_handle *)user_arg;
-    if(data != NULL)
-    {
-        MGW_LOG_INFO(handle->logger, "MESA_htable: key existed, table is %s, key is %s", "ip2user_htable", _key);
-        int rtn = MESA_htable_del(handle->ip2user_htable, key, size, ip2user_htable_data_free_cb);
-        if(rtn != 0)
-        {
-            MGW_LOG_ERROR(handle->logger, "MESA_htable: failed at del, errno is %d, table is %s, key is %s", rtn, "ip2user_htable", _key);
-            return HTABLE_QUERY_CB_FAILURE;
-        }
-        MGW_LOG_INFO(handle->logger, "MESA_htable: succeed at del, table is %s, key is %s", "ip2user_htable", _key);
-    }
-    return HTABLE_QUERY_CB_SUCCESS;
 }
 
 
@@ -169,7 +170,7 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
             sscanf(dhcp_ip, "%s", ip);
 
             //find ip in dhcp range
-            unsigned int _ip = inet_network(ip);
+            uint32_t _ip = inet_network(ip);
             if(_ip == INADDR_NONE)
             {
                 MGW_LOG_ERROR(handle->logger, "Invalid dhcp_ip: %s", ip);
@@ -182,10 +183,9 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
             }
             //set ip2user
             long cb_rtn = -1;
-            size_t key_size = sizeof(_ip);
-            //printf("serach: key is %s\n", ip);
-            MESA_htable_search_cb(handle->ip2user_htable, (const unsigned char *)(&_ip), key_size, ip2user_cb_to_del_key, (void *)handle, &cb_rtn);
-            int rtn = MESA_htable_add(handle->ip2user_htable, (const unsigned char *)(&_ip), key_size, user_name);
+            uint32_t key = inet_addr(ip);
+            MESA_htable_search_cb(handle->ip2user_htable, (const unsigned char *)(&key), sizeof(key), ip2user_cb_to_del_key, (void *)handle, &cb_rtn);
+            int rtn = MESA_htable_add(handle->ip2user_htable, (const unsigned char *)(&key), sizeof(key), user_name);
             if(rtn < 0)
             {
                 MGW_LOG_ERROR(handle->logger, "MESA_htable: failed at add, table is %s, key is %s, value is %s", "ip2user_htable", ip, user_name);
@@ -202,8 +202,8 @@ void * thread_vpn_monitor(void* args)
     struct vpn_monitor_handle *handle = vpn_monitor_init(args);
     while(1)
     {
-        sleep(3);
         printf("vpn monitor--------------\n");
         get_ip2user_by_vpncmd(handle);
+        sleep(3600);
     }
 }

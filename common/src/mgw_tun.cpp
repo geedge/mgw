@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef TUN_H_INCLUDED
 #define TUN_H_INCLUDED
 #endif
@@ -25,13 +23,13 @@ struct mgw_tun_handle
 };
 
 
-struct mgw_tun_handle * mgw_tun_init(char *dev, void *logger)
+struct mgw_tun_handle * mgw_tun_init(const char *dev, void *logger)
 {
     struct ifreq ifr;
     int fd, err;
     if ((fd = open("/dev/net/tun", O_RDWR)) < 0)
     {
-        MGW_LOG_ERROR(logger, "Failed at open /dev/net/tun: errno %d is %s", errno, strerror(errno));
+        MGW_LOG_ERROR(logger, "mgw_tun: Failed at open /dev/net/tun: errno is %d, %s", errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
     memset(&ifr, 0, sizeof(ifr));
@@ -42,11 +40,10 @@ struct mgw_tun_handle * mgw_tun_init(char *dev, void *logger)
     }
     if ((err = ioctl(fd, TUNSETIFF, (void *) &ifr)) < 0)
     {
-        MGW_LOG_ERROR(logger, "Failed at ioctl: errno %d is %s", errno,strerror(errno));
+        MGW_LOG_ERROR(logger, "mgw_tun: Failed at ioctl: errno is %d, %s", errno,strerror(errno));
         close(fd);
         exit(EXIT_FAILURE);
     }
-    strcpy(dev, ifr.ifr_name);
     struct mgw_tun_handle *handle = ALLOC(struct mgw_tun_handle, 1);
     handle->fd = fd;
     handle->logger = logger;
@@ -60,49 +57,35 @@ void mgw_tun_destroy(struct mgw_tun_handle *handle)
 }
 
 
-int mgw_tun_read(struct mgw_tun_handle *handle, char *recv_ip_pkts, size_t ip_pkt_len)
+int mgw_tun_read(struct mgw_tun_handle *handle, char *buff, size_t len)
  {
-    int recv_ip_len = 0;
-    recv_ip_len = read(handle->fd, recv_ip_pkts, ip_pkt_len);
-    if(recv_ip_len < 0)
+    void *logger = handle->logger;
+    int recv_len = 0;
+    recv_len = read(handle->fd, buff, len);
+    if(recv_len < 0)
     {
         close(handle->fd);
-        MGW_LOG_ERROR(handle->logger, "Failed at tun_read errno %d is %s\n", errno, strerror(errno));
-		exit(EXIT_FAILURE);
+        MGW_LOG_ERROR(logger, "mgw_tun: Failed at read from tun, errno is %d, %s\n", errno, strerror(errno));
     }
-    else
-    {
-        return recv_ip_len;
-    }
+    return recv_len;
  }
 
-
- /**************************************************************************
- * write_to_tun: write data to tun                                         *
- * return:write bytes                                                      *
- **************************************************************************/
-int mgw_tun_write(int tun_fd, char *send_ip_pkts, int send_ip_len)
+int mgw_tun_write(struct mgw_tun_handle *handle, char *buff, size_t len)
  {
-    assert(send_ip_pkts !=NULL);
-    assert(send_ip_len > 0);
-    int cur_snd_ip_len = 0 ;
-    cur_snd_ip_len = write(tun_fd, send_ip_pkts, send_ip_len);
-    if(cur_snd_ip_len < 0)
+    void *logger = handle->logger;
+    int send_len = 0 ;
+    send_len = write(handle->fd, buff, len);
+    if(send_len < 0)
     {
-        printf(" send ip pkts errno = %d, content is %s\n",errno, strerror(errno));
-		assert(0);
+        MGW_LOG_ERROR(logger, "mgw_tun: Failed at write to tun, errno is %d, %s", errno, strerror(errno));
     }
     else
     {
-        if(cur_snd_ip_len < send_ip_len)
+        if(send_len < len)
         {
-            close(tun_fd);
-            printf("the ip data can not send completely!\n");
-            assert(0);
-        }
-        else
-        {
-            return cur_snd_ip_len;
+            close(handle->fd);
+            MGW_LOG_ERROR(logger, "mgw_tun: Failed at write to tun completely, need send %d but only send %d", len, send_len);
         }
     }
+    return send_len;
  }

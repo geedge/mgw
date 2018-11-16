@@ -55,4 +55,4 @@ MESA_htable_handle mgw_utils_create_htable(const char *symbol, struct htable_opt
 
 unsigned int mgw_utils_get_random(unsigned int num);
 
-const char * mgw_utils_inet_ntoa(unsigned int ip);
+int mgw_utils_inet_ntoa(unsigned int ip, char *dest);

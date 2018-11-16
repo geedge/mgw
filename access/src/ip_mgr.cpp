@@ -43,9 +43,10 @@ struct ip_verify_htable_value
     uint32_t ip;
     bool is_valid;
 };
+
 struct cand_ip_htable_value
 {
-    struct cand_ip *ip_group[GROUP_IP_MAX];
+    struct ip_mgr_cand_ip *ip_group[GROUP_IP_MAX];
     unsigned int num;
 };
 
@@ -98,7 +99,7 @@ static long user_policy_htable_query_cb(void *data, const uchar *key, uint size,
 }
 
 
-struct cand_ip* ip_mgr_candidata_ip_get(struct ip_mgr_handle *handle, const char *user_name)
+struct ip_mgr_cand_ip* ip_mgr_candidata_ip_get(struct ip_mgr_handle *handle, const char *user_name)
 {
     void *logger = handle->logger;
     long user_policy_cb_rtn = 0;
@@ -141,7 +142,13 @@ static void user_info_htable_data_free_cb(void *data)
 
 static void cand_ip_htable_data_free_cb(void *data)
 {
-    FREE(&data);
+    struct cand_ip_htable_value *value = (struct cand_ip_htable_value *)data;
+    int num = value->num;
+    for(int i = 0; i < num; i++)
+    {
+        FREE(&(value->ip_group[i]));
+    }
+    FREE(&value);
 }
 
 static void ip_verify_htable_data_free_cb(void *data)
@@ -248,17 +255,18 @@ static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* a
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
 	MGW_LOG_INFO(logger, "Maat_redis: update callback, table is CAND_IP_TABLE");
+    //MGW_LOG_INFO(logger, "Maat_redis: update callback, table_line is %s", table_line);
     int config_id, group_id, addr_type, location, link_id, encap_type, direction, is_valid;
-    char ip_addr[MGW_SYMBOL_MAX];
-    char mrl_ip[MGW_SYMBOL_MAX];
-    char outer_sport[MGW_SYMBOL_MAX];
-    char outer_dport[MGW_SYMBOL_MAX];
-    char outer_sip[MGW_SYMBOL_MAX];
-    char outer_dip[MGW_SYMBOL_MAX];
-    char outer_smac[MGW_SYMBOL_MAX];
-    char outer_dmac[MGW_SYMBOL_MAX];
-    char inner_smac[MGW_SYMBOL_MAX];
-    char inner_dmac[MGW_SYMBOL_MAX];
+    char ip_addr[IP_MGR_IP_LEN];
+    char mrl_ip[IP_MGR_IP_LEN];
+    char outer_sport[IP_MGR_PORT_LEN];
+    char outer_dport[IP_MGR_PORT_LEN];
+    char outer_sip[IP_MGR_IP_LEN];
+    char outer_dip[IP_MGR_IP_LEN];
+    char outer_smac[IP_MGR_MAC_LEN];
+    char outer_dmac[IP_MGR_MAC_LEN];
+    char inner_smac[IP_MGR_MAC_LEN];
+    char inner_dmac[IP_MGR_MAC_LEN];
     sscanf(table_line, "%d %d %d %s %d %s %d %d %d %s %s %s %s %s %s %s %s %d", &config_id, &group_id, &addr_type, ip_addr, &location, mrl_ip, &link_id, &encap_type, &direction, outer_sport, outer_dport, 
         outer_sip, outer_dip, outer_smac, outer_dmac, inner_smac, inner_dmac, &is_valid);
     uint32_t ip = inet_addr(ip_addr);
@@ -278,9 +286,24 @@ static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* a
                 return;
             }
         }
-        struct cand_ip *_cand_ip = ALLOC(struct cand_ip, 1);
+        struct ip_mgr_cand_ip *_cand_ip = ALLOC(struct ip_mgr_cand_ip, 1);
         _cand_ip->ip = ip;
-        _cand_ip->reference = 0;
+         _cand_ip->reference = 0;
+        struct ip_mgr_vxlan_info *vxlan_info = ALLOC(struct ip_mgr_vxlan_info, 1);
+
+        strncpy(vxlan_info->vxlan_outer_local_port, outer_sport, IP_MGR_PORT_LEN);
+        strncpy(vxlan_info->vxlan_outer_gdev_port, outer_dport, IP_MGR_PORT_LEN);
+        strncpy(vxlan_info->vxlan_outer_local_ip, outer_sip, IP_MGR_IP_LEN);
+        strncpy(vxlan_info->vxlan_outer_gdev_ip, outer_dip, IP_MGR_IP_LEN);
+        strncpy(vxlan_info->vxlan_outer_local_mac, outer_smac, IP_MGR_MAC_LEN);
+        strncpy(vxlan_info->vxlan_outer_gdev_mac, outer_dmac, IP_MGR_MAC_LEN);
+        strncpy(vxlan_info->vxlan_inner_smac, inner_smac, IP_MGR_MAC_LEN);
+        strncpy(vxlan_info->vxlan_inner_dmac, inner_dmac, IP_MGR_MAC_LEN);
+        vxlan_info->vxlan_link_id = link_id;
+        vxlan_info->vxlan_link_dir = direction;
+        vxlan_info->vxlan_encap_type = encap_type;
+
+        _cand_ip->vxlan_info = vxlan_info;
         int num = ip_group->num;
         ip_group->ip_group[num] = _cand_ip;
         ip_group->num ++;
@@ -356,8 +379,16 @@ struct ip_mgr_handle *ip_mgr_init(void *logger, Maat_feather_t feather, struct h
     handle->user_policy_htable = mgw_utils_create_htable("user_info_htable", opts, (void *)user_info_htable_data_free_cb, NULL);
     handle->cand_ip_htable = mgw_utils_create_htable("cand_ip_htable", opts, (void *)cand_ip_htable_data_free_cb, NULL);
     handle->ip_verify_htable = mgw_utils_create_htable("ip_verify_htable", opts, (void *)ip_verify_htable_data_free_cb, NULL);
-    Maat_plugin_register(feather, "USER_POLICY_TABLE", Maat_user_policy_start_cb, Maat_user_policy_update_cb, Maat_user_policy_finish_cb, handle);
-    Maat_plugin_register(feather, "CAND_IP_TABLE", Maat_cand_ip_start_cb, Maat_cand_ip_update_cb, Maat_cand_ip_finish_cb, handle);
+    int rtn = Maat_plugin_register(feather, "IR_POLICY", Maat_user_policy_start_cb, Maat_user_policy_update_cb, Maat_user_policy_finish_cb, handle);
+    if(rtn == -1)
+    {
+        return NULL;   
+    }
+    rtn = Maat_plugin_register(feather, "IR_CANDIDATE_IP", Maat_cand_ip_start_cb, Maat_cand_ip_update_cb, Maat_cand_ip_finish_cb, handle);
+    if(rtn == -1)
+    {
+        return NULL;
+    }
     return handle;
 }
 

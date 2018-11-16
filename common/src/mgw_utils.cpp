@@ -51,12 +51,12 @@ MESA_htable_handle mgw_utils_create_htable(const char *symbol, struct htable_opt
 
 unsigned int mgw_utils_get_random(unsigned int num)
 {
-    srand((unsigned)time(NULL)); 
     return (rand() % num);
 }
 
-const char * mgw_utils_inet_ntoa(unsigned int ip)
+int mgw_utils_inet_ntoa(unsigned int ip, char *dest)
  {
 	 const char *_ip = inet_ntoa(*(struct in_addr *)&ip);
-	 return _ip;
+	 strncpy(dest, _ip, MGW_SYMBOL_MAX);
+	 return 0;
  }

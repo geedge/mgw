@@ -21,8 +21,22 @@ void test_htable_data_free_cb(void *data)
     //FREE(&data);
 }
 
+
+struct candidate_port
+{
+    unsigned char access_id : 2;
+    unsigned char  random : 6;
+    unsigned char  hash : 8;
+};
+
 int main()
 {
+    struct candidate_port port;
+    printf("size of port is %d\n", sizeof(candidate_port));
+    port.access_id = 0x3;
+    port.random = 0x39;
+    port.hash = 0xff;
+    printf("port is %0x\n", port);
     /*
     const char *profile = "./conf/mgw.conf";
     void *logger = MESA_create_runtime_log_handle("./log/mgw.log", RLOG_LV_DEBUG);
@@ -39,9 +53,5 @@ int main()
     */
     //char ip[MGW_SYMBOL_MAX] = "1.0.0.0";
     //uint32_t _ip = inet_addr(ip);
-    char *ip;
-    uint32_t _ip = 1;
-    ip = inet_ntoa(*(struct in_addr *)&_ip);
-    printf("_ip is %s\n", ip);
 }
 

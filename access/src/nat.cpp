@@ -29,13 +29,6 @@ struct ip_port_pair
      uint16_t port;
 };
 
-struct candidate_port
-{
-    unsigned int access_id : 2;
-    unsigned int random : 6;
-    unsigned int hash : 8;
-};
-
 struct nat_ctx
 {
     void *logger;
@@ -54,8 +47,8 @@ static int sess_get_from_packet(const char *buff, int len, struct session *sess)
     }
     struct iphdr *_iphdr = (struct iphdr *)buff;
     int iphdr_len = _iphdr->ihl * 4;
-    sess->sip = ntohl(_iphdr->saddr);
-    sess->dip = ntohl(_iphdr->daddr);
+    sess->sip = _iphdr->saddr;
+    sess->dip = _iphdr->daddr;
     sess->proto = _iphdr->protocol;
     switch(sess->proto)
     {
@@ -66,8 +59,8 @@ static int sess_get_from_packet(const char *buff, int len, struct session *sess)
                 return -1;
             }
             struct tcphdr *_tcphdr = (struct tcphdr *)(buff + iphdr_len);
-            sess->sport = ntohs(_tcphdr->source);
-            sess->dport = ntohs(_tcphdr->dest);
+            sess->sport = _tcphdr->source;
+            sess->dport = _tcphdr->dest;
             break;
         }
         case PROTO_UDP:
@@ -77,8 +70,8 @@ static int sess_get_from_packet(const char *buff, int len, struct session *sess)
                 return -1;
             }
             struct udphdr *_udphdr = (struct udphdr *)(buff + iphdr_len);
-            sess->sport = ntohs(_udphdr->source);
-            sess->dport = ntohs(_udphdr->dest);
+            sess->sport = _udphdr->source;
+            sess->dport = _udphdr->dest;
             break;
         }
         case PROTO_ICMP:
@@ -98,6 +91,7 @@ static int sess_get_from_packet(const char *buff, int len, struct session *sess)
 
 static int packet_src_replace(const char *buff, int len, struct ip_port_pair *pair)
 {
+    
     struct iphdr *_iphdr = (struct iphdr *)buff;
     int iphdr_len = _iphdr->ihl * 4;
     _iphdr->saddr = pair->ip;
@@ -212,27 +206,28 @@ static long dnat_htable_query_cb(void *data, const uchar *key, uint size, void *
     }
 }
 
-static uint16_t get_candidate_port(int access_id, struct session *sess)
+static uint16_t get_candidate_port(int access_id, struct session *sess, uint32_t cand_ip)
 {   
-    struct candidate_port *port = ALLOC(struct candidate_port, 1);
-    port->access_id = 0;
-    unsigned int random  = mgw_utils_get_random(64);
-    port->random = random;
-    unsigned int hash = (sess->sip)^(sess->dip)^(sess->sport)^(sess->dport)^(sess->proto);
-    hash &= 0xff;
-    port->hash = hash;
-    u_int16_t _port = *((u_int16_t *)port);
-    return _port;
+    u_int16_t random  = mgw_utils_get_random(64);
+    uint16_t hash = ((sess->dip)^(htons(sess->dport))^(sess->proto)^cand_ip)&0xff;
+    uint16_t port = (access_id << 14) + (random << 8) + hash;
+    return htons(port);
 }
 
-static struct ip_port_pair * snat_pair_get(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_handle, const char *user_name, struct session *snat_key)
+static struct ip_port_pair * snat_pair_get(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_handle, 
+                            const char *user_name, struct session *snat_key, struct ip_mgr_vxlan_info **vxlan_info)
 {
     int retry_times = 10;
     void *logger = handle->logger;
     for(int i = 0; i < retry_times; i++)
     {
-        struct cand_ip* _cand_ip = ip_mgr_candidata_ip_get(_ip_mgr_handle, user_name);
-        u_int16_t port = get_candidate_port(handle->access_id, snat_key);
+        struct ip_mgr_cand_ip* _cand_ip = ip_mgr_candidata_ip_get(_ip_mgr_handle, user_name);
+        if(_cand_ip == NULL)
+        {
+            MGW_LOG_INFO(logger, "Failed to find ip and port, user_name is %s", user_name);
+            return NULL;
+        }
+        u_int16_t port = get_candidate_port(handle->access_id, snat_key, _cand_ip->ip);
         struct session dnat_key;
         dnat_key.sip = snat_key->dip;
         dnat_key.sport = snat_key->dport;
@@ -253,6 +248,7 @@ static struct ip_port_pair * snat_pair_get(struct nat_handle *handle, struct ip_
             selected_pair->ip = _cand_ip->ip;
             _cand_ip->reference ++;
             selected_pair->port = port;
+            *vxlan_info = _cand_ip->vxlan_info;
             return selected_pair;
         }
     }
@@ -260,7 +256,7 @@ static struct ip_port_pair * snat_pair_get(struct nat_handle *handle, struct ip_
     return NULL;
 }
 
-int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_handle, char *buff, int len)
+int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_handle, char *buff, int len, struct ip_mgr_vxlan_info **vxlan_info)
 {
     void *logger = handle->logger;
     //get session
@@ -271,6 +267,16 @@ int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_han
         MGW_LOG_ERROR(logger, "Failed at parse packet, len is %d", len);
         return NAT_COVERT_FAILURE;
     }
+    char snat_key_sip[MGW_SYMBOL_MAX];
+    char snat_key_dip[MGW_SYMBOL_MAX];
+    char snat_value_ip[MGW_SYMBOL_MAX];
+    char dnat_key_sip[MGW_SYMBOL_MAX];
+    char dnat_key_dip[MGW_SYMBOL_MAX];
+    char dnat_value_ip[MGW_SYMBOL_MAX];
+    mgw_utils_inet_ntoa(snat_key.sip, snat_key_sip);
+    mgw_utils_inet_ntoa(snat_key.dip, snat_key_dip);
+    MGW_LOG_INFO(logger, "Before snat: session is <%s:%d  %s:%d  %d>", 
+        snat_key_sip, ntohs(snat_key.sport), snat_key_dip, ntohs(snat_key.dport), snat_key.proto);
     //query snat_htable，get ip_port pair
     long snat_cb_rtn = -1;
     struct ip_port_pair snat_value;
@@ -278,8 +284,9 @@ int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_han
     bool ip_is_valid = ip_mgr_candidate_ip_verify(_ip_mgr_handle, snat_value.ip);
     if(snat_cb_rtn == HTABLE_KEY_EXISTED && ip_is_valid == true)
     {
-        MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s， key is <%s:%d %s,%d, %d>, value is <%s, %d>", "ip2user_htable",
-             mgw_utils_inet_ntoa(snat_key.sip), snat_key.sport, mgw_utils_inet_ntoa(snat_key.dip), snat_key.dport, snat_key.proto, mgw_utils_inet_ntoa(snat_value.ip), snat_value.port);
+        mgw_utils_inet_ntoa(snat_value.ip, snat_value_ip);
+        MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s， key is <%s:%d  %s:%d  %d>, value is <%s, %d>", "ip2user_htable",
+             snat_key_sip, ntohs(snat_key.sport), snat_key_dip, ntohs(snat_key.dport), snat_key.proto, snat_value_ip, snat_value.port);
         packet_src_replace(buff, len, &snat_value);
     }
     else
@@ -287,12 +294,12 @@ int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_han
         //if session exists in sant but ip is valid. del session from snat and dnat
         if(snat_cb_rtn == HTABLE_KEY_EXISTED)
         {
-            int rtn = MESA_htable_del(handle->snat_htable, (const unsigned char *)(&snat_key), sizeof(snat_key), NULL);
+            rtn = MESA_htable_del(handle->snat_htable, (const unsigned char *)(&snat_key), sizeof(snat_key), NULL);
             // data may be freed because of expire
             if(rtn < 0 && rtn != MESA_HTABLE_RET_NOT_FOUND)
             {
                 MGW_LOG_ERROR(handle->logger, "MESA_htable: failed at del, errno is %d, table is %s, key is <%s:%d %s,%d, %d>", rtn, "snat_htable", 
-                    mgw_utils_inet_ntoa(snat_key.sip), snat_key.sport, mgw_utils_inet_ntoa(snat_key.dip), snat_key.dport, snat_key.proto);
+                    snat_key_sip, ntohs(snat_key.sport), snat_key_dip, ntohs(snat_key.dport), snat_key.proto);
                 return NAT_COVERT_FAILURE;;
             }
             struct session dnat_key;
@@ -301,11 +308,13 @@ int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_han
             dnat_key.dip = snat_value.ip;
             dnat_key.dport = snat_value.port;
             dnat_key.proto = snat_key.proto;
+            mgw_utils_inet_ntoa(dnat_key.sip, dnat_key_sip);
+            mgw_utils_inet_ntoa(dnat_key.dip, dnat_key_dip);
             rtn = MESA_htable_del(handle->dnat_htable, (const unsigned char *)(&dnat_key), sizeof(dnat_key), NULL);
             if(rtn < 0 && rtn != MESA_HTABLE_RET_NOT_FOUND)
             {
                 MGW_LOG_ERROR(handle->logger, "MESA_htable: failed at del, errno is %d, table is %s, key is <%s:%d %s,%d, %d>", rtn, "dnat_htable", 
-                    mgw_utils_inet_ntoa(dnat_key.sip), dnat_key.sport, mgw_utils_inet_ntoa(snat_key.dip), dnat_key.dport, dnat_key.proto);
+                    snat_key_sip, ntohs(dnat_key.sport), snat_key_dip, ntohs(snat_key.dport), snat_key.proto);
                 return NAT_COVERT_FAILURE;;
             }
         }
@@ -314,19 +323,22 @@ int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_han
         user_name = (char *)MESA_htable_search(handle->ip2user_htable, (const unsigned char *)(&sip), sizeof(sip));
         if(user_name != NULL)
         {
-            struct ip_port_pair *snat_value = snat_pair_get(handle, _ip_mgr_handle, user_name, &snat_key);
+            struct ip_port_pair *snat_value = snat_pair_get(handle, _ip_mgr_handle, user_name, &snat_key, vxlan_info);
             if(snat_value == NULL)
             {
                  return NAT_COVERT_FAILURE;
             }
             //add sess to snat, dnat
-            int rtn = MESA_htable_add(handle->snat_htable, (const unsigned char *)(&snat_key), sizeof(snat_key), (const void*)snat_value);
+            rtn = MESA_htable_add(handle->snat_htable, (const unsigned char *)(&snat_key), sizeof(snat_key), (const void*)snat_value);
+            mgw_utils_inet_ntoa(snat_value->ip, snat_value_ip);
             if(rtn < 0)
             {
-                MGW_LOG_INFO(logger, "MESA_htable: add to %s, key is <%s:%d %s,%d, %d>, value is <%s, %d>", "snat_htable",
-                    mgw_utils_inet_ntoa(snat_key.sip), snat_key.sport, mgw_utils_inet_ntoa(snat_key.dip), snat_key.dport, snat_key.proto, mgw_utils_inet_ntoa(snat_value->ip), snat_value->port);
+                MGW_LOG_ERROR(logger, "MESA_htable: Failed at add to %s, key is <%s:%d %s,%d, %d>, value is <%s, %d>", "snat_htable",
+                    snat_key_sip, ntohs(snat_key.sport), snat_key_dip, ntohs(snat_key.dport), snat_key.proto, snat_value_ip, ntohs(snat_value->port));
                 return NAT_COVERT_FAILURE;
             }
+            MGW_LOG_INFO(logger, "MESA_htable: Succeed at add to %s, key is <%s:%d %s,%d, %d>, value is <%s, %d>", "snat_htable",
+                    snat_key_sip, ntohs(snat_key.sport), snat_key_dip, ntohs(snat_key.dport), snat_key.proto, snat_value_ip, ntohs(snat_value->port));
             struct session dnat_key;
             dnat_key.sip = snat_key.dip;
             dnat_key.sport = snat_key.dport;
@@ -336,49 +348,85 @@ int nat_src_convert(struct nat_handle *handle, struct ip_mgr_handle *_ip_mgr_han
             struct ip_port_pair *dnat_value = ALLOC(struct ip_port_pair, 1);
             dnat_value->ip = snat_key.sip;
             dnat_value->port = snat_key.sport;
+            mgw_utils_inet_ntoa(dnat_key.sip, dnat_key_sip);
+            mgw_utils_inet_ntoa(dnat_key.dip, dnat_key_dip);
+            mgw_utils_inet_ntoa(dnat_value->ip, dnat_value_ip);
             rtn = MESA_htable_add(handle->dnat_htable, (const unsigned char *)(&dnat_key), sizeof(dnat_key), (const void*)dnat_value);
             if(rtn < 0)
             {
-                MGW_LOG_INFO(logger, "MESA_htable: add to %s, key is <%s:%d %s,%d, %d>, value is <%s, %d>", "dnat_htable",
-                    mgw_utils_inet_ntoa(dnat_key.sip), dnat_key.sport, mgw_utils_inet_ntoa(dnat_key.dip), dnat_key.dport, dnat_key.proto, mgw_utils_inet_ntoa(dnat_value->ip), dnat_value->port);
+                MGW_LOG_ERROR(logger, "MESA_htable: Failed at add to %s, key is <%s:%d %s,%d, %d>, value is <%s, %d>", "dnat_htable",
+                    dnat_key_sip, ntohs(dnat_key.sport), dnat_key_dip, ntohs(dnat_key.dport), dnat_key.proto, dnat_value_ip, ntohs(dnat_value->port));
                 return NAT_COVERT_FAILURE;
             }
-            packet_src_replace(buff, len, dnat_value);
+            MGW_LOG_INFO(logger, "MESA_htable: Succeed at add to %s, key is <%s:%d %s,%d, %d>, value is <%s, %d>", "dnat_htable",
+                    dnat_key_sip, ntohs(dnat_key.sport), dnat_key_dip, ntohs(dnat_key.dport), dnat_key.proto, dnat_value_ip, ntohs(dnat_value->port));
+            packet_src_replace(buff, len, snat_value);
+            rtn = sess_get_from_packet(buff, len, &snat_key);
+            if(rtn == -1)
+            {
+                MGW_LOG_ERROR(logger, "Failed at parse packet, len is %d", len);
+                return NAT_COVERT_FAILURE;
+            }
+            mgw_utils_inet_ntoa(snat_key.sip, snat_key_sip);
+            mgw_utils_inet_ntoa(snat_key.dip, snat_key_dip);
+            MGW_LOG_INFO(logger, "After snat: session is <%s:%d  %s:%d  %d>", 
+                snat_key_sip, ntohs(snat_key.sport), snat_key_dip, ntohs(snat_key.dport), snat_key.proto);
             return NAT_COVERT_SUCCESS;
         }
         else
         {
-            MGW_LOG_ERROR(logger, "Failed at find user_name, ip %s", mgw_utils_inet_ntoa(sip));
+            MGW_LOG_ERROR(logger, "Failed at find user_name, ip %s", snat_key_sip);
             return NAT_COVERT_FAILURE;
         }
     }
 }
 
+
 int nat_dest_convert(struct nat_handle *handle, char *buff, int len)
 {
     void *logger = handle->logger;
     //get session
-    struct session *sess = ALLOC(struct session, 1);
-    int rtn = sess_get_from_packet(buff, len, sess);
+    struct session dnat_key;
+    int rtn = sess_get_from_packet(buff, len, &dnat_key);
     if(rtn == -1)
     {
-        MGW_LOG_ERROR(logger, "Failed at sess_get_from_packet, packet len is %d", len);
+        MGW_LOG_ERROR(logger, "Failed at parse packet, packet len is %d", len);
         return NAT_COVERT_FAILURE;
     }
+    char dnat_key_sip[MGW_SYMBOL_MAX];
+    char dnat_key_dip[MGW_SYMBOL_MAX];
+    char dnat_value_ip[MGW_SYMBOL_MAX];
+    mgw_utils_inet_ntoa(dnat_key.sip, dnat_key_sip);
+    mgw_utils_inet_ntoa(dnat_key.dip, dnat_key_dip);
+    MGW_LOG_INFO(logger, "Before dnat: session is <%s:%d  %s:%d  %d>", 
+        dnat_key_sip, ntohs(dnat_key.sport), dnat_key_dip, ntohs(dnat_key.dport), dnat_key.proto);
+
     //query dnat，get ip and port
      long dnat_cb_rtn = -1;
-     struct ip_port_pair pair;
-     MESA_htable_search_cb(handle->dnat_htable, (const unsigned char *)(&sess), sizeof(sess), dnat_htable_query_cb, (void *)(&pair), &dnat_cb_rtn);
+     struct ip_port_pair dnat_value;
+     MESA_htable_search_cb(handle->dnat_htable, (const unsigned char *)(&dnat_key), sizeof(dnat_key), dnat_htable_query_cb, (void *)(&dnat_value), &dnat_cb_rtn);
     if(dnat_cb_rtn == HTABLE_KEY_EXISTED)
     {
+        mgw_utils_inet_ntoa(dnat_value.ip, dnat_value_ip);
         MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s， key is <%s:%d %s,%d, %d>, value is <%s, %d>", "dnat_htable",
-             mgw_utils_inet_ntoa(sess->sip), sess->sport, mgw_utils_inet_ntoa(sess->dip), sess->dport, sess->proto, mgw_utils_inet_ntoa(pair.ip), pair.port);
-        packet_dest_replace(buff, len, &pair);
+            dnat_key_sip, ntohs(dnat_key.sport), dnat_key_dip, ntohs(dnat_key.dport), dnat_key.proto, dnat_value_ip, ntohs(dnat_value.port));
+        packet_dest_replace(buff, len, &dnat_value);
+        rtn = sess_get_from_packet(buff, len, &dnat_key);
+        if(rtn == -1)
+        {
+            MGW_LOG_ERROR(logger, "Failed at parse packet, len is %d", len);
+            return NAT_COVERT_FAILURE;
+        }
+        mgw_utils_inet_ntoa(dnat_key.sip, dnat_key_sip);
+        mgw_utils_inet_ntoa(dnat_key.dip, dnat_key_dip);
+        MGW_LOG_INFO(logger, "After snat: session is <%s:%d  %s:%d  %d>", 
+            dnat_key_sip, ntohs(dnat_key.sport), dnat_key_dip, ntohs(dnat_key.dport), dnat_key.proto);
+        return NAT_COVERT_SUCCESS;
     }
     else
     {
-        MGW_LOG_ERROR(logger, "MESA_htable: key not existed, table is %s， key is <%s:%d %s,%d, %d>", "dnat_htable", 
-             mgw_utils_inet_ntoa(sess->sip), sess->sport, mgw_utils_inet_ntoa(sess->dip), sess->dport, sess->proto);
+        MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s， key is <%s:%d %s,%d, %d>", "dnat_htable",
+            dnat_key_sip, ntohs(dnat_key.sport), dnat_key_dip, ntohs(dnat_key.dport), dnat_key.proto);
         return NAT_COVERT_FAILURE;
     }
 }

@@ -1,4 +1,4 @@
-add_executable(mgw src/main.cpp src/vpn_monitor.cpp src/nat.cpp src/ip_mgr.cpp)
+add_executable(mgw src/main.cpp src/vpn_monitor.cpp src/nat.cpp src/ip_mgr.cpp src/udp_server.cpp)
 
 target_include_directories(mgw PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
@@ -15,7 +15,7 @@ target_link_libraries(mgw pthread dl
 # target_link_libraries(tfe -Wl,--whole-archive pangu-http -Wl,--no-whole-archive)
 
 
-#[[add_executable(test_maat_redis test/test_maat_redis.cpp)
+add_executable(test_maat_redis test/test_maat_redis.cpp)
 
 target_include_directories(test_maat_redis PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
@@ -26,7 +26,7 @@ target_link_libraries(test_maat_redis pthread dl
 		MESA_htable 
         wiredcfg
 		MESA_field_stat
-        maatframe)]]
+        maatframe)
 
 
 add_executable(test_tun test/test_tun.cpp)
