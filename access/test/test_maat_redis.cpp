@@ -79,7 +79,7 @@ void Maat_test_set_cmd_line(Maat_feather_t feather)
 	}
 	
 
-	ret=Maat_cmd_set_lines(feather, p_line, TEST_CMD_LINE_NUM, MAAT_OP_DEL);
+	ret=Maat_cmd_set_lines(feather, p_line, TEST_CMD_LINE_NUM, MAAT_OP_ADD);
 	assert(ret>0);
 	/*
 	for(i=0;i<TEST_CMD_LINE_NUM;i++)

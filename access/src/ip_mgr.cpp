@@ -4,32 +4,14 @@
 #include "ip_mgr.h"
 #define GROUP_IP_MAX 4096
 
-/*
-{
-	"plugin_table":[   
-		{
-	  	"table_name":"IR_CANDINATE_IP",
-	  	"table_content":[
-                "1\t101\t4\t202.104.1.123\t0\t192.168.10.180\t1\t0\t0\t4789\t50000\t192.168.14.1\t10.2.2.2\t24:6e:96:c9:77:d0\t00:1e:73:6c:fa:44\te8:61:1f:13:70:7a\t18:31:bf:e4:a5:a0\t1"	  		
-				]
-	 	},
-	 	{
-	  	"table_name":"IR_POLICY",
-	  	"table_content":[
-                "1\t101\t0\tuser\t1"
-	  			]
-	 	}
-    ]
-}
-*/
-
 struct ip_mgr_handle
 {
     void *logger;
     Maat_feather_t feather;
     MESA_htable_handle user_policy_htable;  //expire_time: 0
-    MESA_htable_handle cand_ip_htable; //expire_time: 0
-    MESA_htable_handle ip_verify_htable; //expire_time: 0
+    MESA_htable_handle cand_ip_group_htable; //expire_time: 0
+    MESA_htable_handle cand_ip_detail_htable; //expire_time: 0
+    struct field_stat_handle *fs_handle;
 };
 
 struct user_policy_htable_value
@@ -38,53 +20,11 @@ struct user_policy_htable_value
     int group_id;
 };
 
-struct ip_verify_htable_value
+struct cand_ip_group_htable_value
 {
-    uint32_t ip;
-    bool is_valid;
-};
-
-struct cand_ip_htable_value
-{
-    struct ip_mgr_cand_ip *ip_group[GROUP_IP_MAX];
+    uint32_t ip_list[GROUP_IP_MAX];
     unsigned int num;
 };
-
-
-static long ip_verify_htable_query_cb(void *data, const uchar *key, uint size, void *user_args)
-{
-    bool *is_valid = (bool *)user_args;
-    if(data != NULL)
-    {
-        struct ip_verify_htable_value *_data = (struct ip_verify_htable_value*)data;
-        *is_valid = _data->is_valid;
-        return HTABLE_KEY_EXISTED; 
-    }
-    return HTABLE_KEY_NOT_EXISTED;
-}
-
-bool ip_mgr_candidate_ip_verify(struct ip_mgr_handle *handle, uint32_t ip)
-{
-    long ip_verify_cb_rtn = 0;
-    bool is_valid;
-    MESA_htable_search_cb(handle->ip_verify_htable, (const unsigned char *)(&ip), sizeof(ip), ip_verify_htable_query_cb, &is_valid, &ip_verify_cb_rtn);
-    if(ip_verify_cb_rtn == HTABLE_KEY_EXISTED)
-    {
-        if(is_valid == true)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    else
-    {
-        return false;
-    }
-}
-
 
 static long user_policy_htable_query_cb(void *data, const uchar *key, uint size, void *user_args)
 {
@@ -99,39 +39,48 @@ static long user_policy_htable_query_cb(void *data, const uchar *key, uint size,
 }
 
 
-struct ip_mgr_cand_ip* ip_mgr_candidata_ip_get(struct ip_mgr_handle *handle, const char *user_name)
+int ip_mgr_candidata_ip_get(struct ip_mgr_handle *handle, const char *user_name, uint32_t *selected_ip)
 {
+    struct field_stat_handle *fs_handle = handle->fs_handle;
     void *logger = handle->logger;
     long user_policy_cb_rtn = 0;
     int group_id;
     int key_size = strnlen(user_name, MGW_SYMBOL_MAX);
     MESA_htable_search_cb(handle->user_policy_htable, (const unsigned char *)user_name, key_size, user_policy_htable_query_cb, &group_id, &user_policy_cb_rtn);
+    FS_operate(fs_handle->handle, fs_handle->line_user_policy, fs_handle->cloumn_queyr_num, FS_OP_ADD, 1);
     if(user_policy_cb_rtn == HTABLE_KEY_EXISTED)
     {
+        FS_operate(fs_handle->handle, fs_handle->line_user_policy, fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
         MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, key is %s, group id is %d", "user_policy", user_name, group_id);
-        struct cand_ip_htable_value *ip_group = NULL;
-        ip_group = (struct cand_ip_htable_value *)MESA_htable_search(handle->cand_ip_htable, (const unsigned char *)(&group_id), sizeof(group_id));
+        struct cand_ip_group_htable_value *ip_group = NULL;
+        ip_group = (struct cand_ip_group_htable_value *)MESA_htable_search(handle->cand_ip_group_htable, (const unsigned char *)(&group_id), sizeof(group_id));
+        FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_queyr_num, FS_OP_ADD, 1);
         if(ip_group != NULL)
         {
+            MGW_LOG_INFO(logger, "MESA_htable: key existed. table is %s, key is %d", "cand_ip_group_htable", group_id);
+            FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
             unsigned int num = ip_group->num;
             if(num <= 0)
             {
                 MGW_LOG_ERROR(logger, "The cand_ip is empty, group_id is %d", group_id);
-                return NULL;
+                return -1;
             }
             unsigned int index = mgw_utils_get_random(num);
-            return ip_group->ip_group[index];
+            *selected_ip = ip_group->ip_list[index];
+            return 0;
         }
         else
         {
-            MGW_LOG_ERROR(logger, "MESA_htable: key not existed. table is %s, key is %d", "cand_ip_htable", group_id);
-            return NULL;
+            FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+            MGW_LOG_ERROR(logger, "MESA_htable: key not existed. table is %s, key is %d", "cand_ip_group_htable", group_id);
+            return -1;
         }
     }
     else
     {
+        FS_operate(fs_handle->handle, fs_handle->line_user_policy, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
         MGW_LOG_ERROR(logger, "MESA_htable: key not existed. table is %s, key is %s", "user_policy_htable", user_name);
-        return NULL;
+        return -1;
     }
 }
 
@@ -140,29 +89,19 @@ static void user_info_htable_data_free_cb(void *data)
     FREE(&data);
 }
 
-static void cand_ip_htable_data_free_cb(void *data)
-{
-    struct cand_ip_htable_value *value = (struct cand_ip_htable_value *)data;
-    int num = value->num;
-    for(int i = 0; i < num; i++)
-    {
-        FREE(&(value->ip_group[i]));
-    }
-    FREE(&value);
-}
-
-static void ip_verify_htable_data_free_cb(void *data)
+static void cand_ip_group_htable_data_free_cb(void *data)
 {
     FREE(&data);
 }
 
-static int delete_ip_from_group(uint32_t ip, struct cand_ip_htable_value *ip_group)
+
+static int delete_ip_from_group(uint32_t ip, struct cand_ip_group_htable_value *ip_group)
 {
     int num = ip_group->num;
     int pos = -1;
     for(int i = 0; i < num; i++)
     {
-        if(ip_group->ip_group[i]->ip == ip)
+        if(ip_group->ip_list[i] == ip)
         {
             pos = i;
             break;
@@ -174,14 +113,14 @@ static int delete_ip_from_group(uint32_t ip, struct cand_ip_htable_value *ip_gro
     }
     for(int i = pos; i < num - 1; i++)
     {
-        ip_group->ip_group[i] = ip_group->ip_group[i + 1];
+        ip_group->ip_list[i] = ip_group->ip_list[i + 1];
     }
     ip_group->num --;
     return 0;
 }
 
 
-static void Maat_user_policy_start_cb(int update_type,void* args)
+static void Maat_user_policy_start_cb(int update_type, void* args)
 {
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
@@ -193,6 +132,7 @@ static void Maat_user_policy_update_cb(int table_id, const char* table_line, voi
 {
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
+    struct field_stat_handle *fs_handle = handle->fs_handle;
     MGW_LOG_INFO(logger, "Maat_redis: update callback, table is USER_POLICY_TABLE");
     int config_id, group_id, user_type, is_valid;
     char user_name[MGW_SYMBOL_MAX];
@@ -207,8 +147,11 @@ static void Maat_user_policy_update_cb(int table_id, const char* table_line, voi
         int rtn = MESA_htable_add(handle->user_policy_htable, (const unsigned char *)user_name, key_size, value);
         if(rtn < 0)
         {
-            MGW_LOG_ERROR(handle->logger, "MESA_htable: failed at add, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at add, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+            return;
         }
+        MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at add, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+        FS_operate(fs_handle->handle, fs_handle->line_user_policy, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
     }
     else
     {
@@ -216,8 +159,11 @@ static void Maat_user_policy_update_cb(int table_id, const char* table_line, voi
         int rtn = MESA_htable_del(handle->user_policy_htable, (const unsigned char *)user_name, key_size, NULL);
         if(rtn < 0)
         {
-            MGW_LOG_ERROR(handle->logger, "MESA_htable: failed at del, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+            return;
         }
+        MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at del, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+        FS_operate(fs_handle->handle, fs_handle->line_user_policy, fs_handle->cloumn_element_num, FS_OP_ADD, -1);
     }
 	return;
 }
@@ -227,8 +173,8 @@ static void Maat_user_policy_finish_cb(void* args)
 {
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    Maat_feather_t feather = handle->feather;
     MGW_LOG_INFO(logger, "Maat_redis: finish callback, table is USER_POLICY_TABLE");
+    //Maat_feather_t feather = handle->feather;
     /*
 	long long version=0;
 	int ret=0, is_last_updating_table = 0;
@@ -244,6 +190,7 @@ static void Maat_user_policy_finish_cb(void* args)
 
 static void Maat_cand_ip_start_cb(int update_type,void* args)
 {
+    printf("Maat_cand_ip_start_cb:  update_type is %d\n", update_type);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
     MGW_LOG_INFO(logger, "Maat_redis: start callback, table is CAND_IP_TABLE");
@@ -253,10 +200,11 @@ static void Maat_cand_ip_start_cb(int update_type,void* args)
 static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* args)
 {
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
+    struct field_stat_handle *fs_handle = handle->fs_handle;
     void *logger = handle->logger;
 	MGW_LOG_INFO(logger, "Maat_redis: update callback, table is CAND_IP_TABLE");
     //MGW_LOG_INFO(logger, "Maat_redis: update callback, table_line is %s", table_line);
-    int config_id, group_id, addr_type, location, link_id, encap_type, direction, is_valid;
+    int config_id, group_id, addr_type, location, link_id, encap_type, direction, is_valid, vpn_id;
     char ip_addr[IP_MGR_IP_LEN];
     char mrl_ip[IP_MGR_IP_LEN];
     char outer_sport[IP_MGR_PORT_LEN];
@@ -267,26 +215,37 @@ static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* a
     char outer_dmac[IP_MGR_MAC_LEN];
     char inner_smac[IP_MGR_MAC_LEN];
     char inner_dmac[IP_MGR_MAC_LEN];
-    sscanf(table_line, "%d %d %d %s %d %s %d %d %d %s %s %s %s %s %s %s %s %d", &config_id, &group_id, &addr_type, ip_addr, &location, mrl_ip, &link_id, &encap_type, &direction, outer_sport, outer_dport, 
-        outer_sip, outer_dip, outer_smac, outer_dmac, inner_smac, inner_dmac, &is_valid);
+    sscanf(table_line, "%d %d %d %s %d %s %d %d %d %d %s %s %s %s %s %s %s %s %d", 
+     &config_id, &group_id, &addr_type, ip_addr, &location, mrl_ip, &link_id, &encap_type, &direction, &vpn_id, outer_sport, 
+        outer_dport, outer_sip, outer_dip, outer_smac, outer_dmac, inner_smac, inner_dmac, &is_valid);
     uint32_t ip = inet_addr(ip_addr);
     if(is_valid == 1)
     {
-        //add cand_ip_htable
-        struct cand_ip_htable_value *ip_group = NULL;
-        ip_group = (struct cand_ip_htable_value *)MESA_htable_search(handle->cand_ip_htable, (const unsigned char *)(&group_id), sizeof(group_id));
+        //add cand_ip_group_htable
+        struct cand_ip_group_htable_value *ip_group = NULL;
+        ip_group = (struct cand_ip_group_htable_value *)MESA_htable_search(handle->cand_ip_group_htable, (const unsigned char *)(&group_id), sizeof(group_id));
+        FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_queyr_num, FS_OP_ADD, 1);
         if(ip_group == NULL)
         {
-            ip_group = ALLOC(struct cand_ip_htable_value, 1);
+            MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, group_id is %d", "cand_ip_group_htable", group_id);
+            FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+            ip_group = ALLOC(struct cand_ip_group_htable_value, 1);
             ip_group->num = 0;
-            int rtn = MESA_htable_add(handle->cand_ip_htable, (const unsigned char *)&group_id, sizeof(group_id), (void *)ip_group);
+            int rtn = MESA_htable_add(handle->cand_ip_group_htable, (const unsigned char *)&group_id, sizeof(group_id), (void *)ip_group);
             if(rtn < 0)
             {
-                MGW_LOG_ERROR(logger, "MESA_htable: failed at add, table is %s, group_id is %d", "cand_ip_htable", group_id);
+                MGW_LOG_ERROR(logger, "MESA_htable: Failed at add, table is %s, group_id is %d, errno is %d", "cand_ip_group_htable", group_id, rtn);
                 return;
             }
+            MGW_LOG_INFO(logger, "MESA_htable: Succeed at add, table is %s, group_id is %d", "cand_ip_group_htable", group_id);
+            FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
         }
-        struct ip_mgr_cand_ip *_cand_ip = ALLOC(struct ip_mgr_cand_ip, 1);
+        else
+        {
+            MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s, group_id is %d", "cand_ip_group_htable", group_id);
+            FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+        }
+        struct ip_mgr_cand_ip_detail *_cand_ip = ALLOC(struct ip_mgr_cand_ip_detail, 1);
         _cand_ip->ip = ip;
          _cand_ip->reference = 0;
         struct ip_mgr_vxlan_info *vxlan_info = ALLOC(struct ip_mgr_vxlan_info, 1);
@@ -302,27 +261,63 @@ static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* a
         vxlan_info->vxlan_link_id = link_id;
         vxlan_info->vxlan_link_dir = direction;
         vxlan_info->vxlan_encap_type = encap_type;
+        vxlan_info->vxlan_vpn_id = vpn_id;
 
         _cand_ip->vxlan_info = vxlan_info;
+        _cand_ip->mrl_ip = inet_addr(mrl_ip);
         int num = ip_group->num;
-        ip_group->ip_group[num] = _cand_ip;
+        ip_group->ip_list[num] = ip;
         ip_group->num ++;
+        
+        //add to cand_ip_detail_htable
+        int rtn = MESA_htable_add(handle->cand_ip_detail_htable, (const unsigned char *)&ip, sizeof(ip), (void *)_cand_ip);
+        if(rtn < 0)
+        {
+            MGW_LOG_ERROR(logger, "MESA_htable: Failed at add, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+            return;
+        }
+        MGW_LOG_INFO(logger, "MESA_htable: Succeed at add, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+        FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
     }
     else
     {
-        struct cand_ip_htable_value *ip_group = NULL;
-        ip_group = (struct cand_ip_htable_value *)MESA_htable_search(handle->cand_ip_htable, (const unsigned char *)(&group_id), sizeof(group_id));
+        //delete from cand_ip_group_htable
+        struct cand_ip_group_htable_value *ip_group = NULL;
+        ip_group = (struct cand_ip_group_htable_value *)MESA_htable_search(handle->cand_ip_group_htable, (const unsigned char *)(&group_id), sizeof(group_id));
+        FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_queyr_num, FS_OP_ADD, 1);
         if(ip_group == NULL)
         {
-            MGW_LOG_ERROR(logger, "Failed at del ip from ip_group, group_id %d not existed in cand_ip_htable", group_id);
+            FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+            MGW_LOG_ERROR(logger, "MESA_htable: Failed at del ip from ip_group, group_id %d not existed in cand_ip_group_htable", group_id);
             return;
         }
+        FS_operate(fs_handle->handle, fs_handle->line_ip_group, fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
         int rtn = delete_ip_from_group(ip, ip_group);
         if(rtn == -1)
         {
-            MGW_LOG_ERROR(logger, "Failed at del ip from ip_group, ip %s not in group %d", ip_addr, group_id);
+            MGW_LOG_ERROR(logger, "MESA_htable: Failed at del ip from ip_group, ip %s not in group %d", ip_addr, group_id);
             return;
         }
+
+        //delete from cand_ip_detail_htable
+        struct ip_mgr_cand_ip_detail *cand_ip = NULL;
+        cand_ip = (struct ip_mgr_cand_ip_detail *)MESA_htable_search(handle->cand_ip_detail_htable, (const unsigned char *)(&ip), sizeof(ip));
+        FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_queyr_num, FS_OP_ADD, 1);
+        if(cand_ip == NULL)
+        {
+            FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+            MGW_LOG_ERROR(logger, "MESA_htable: Failed at del ip from cand_ip_detail_htable, key %s not existed", ip_addr);
+            return;
+        }
+        FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
+        rtn = MESA_htable_del(handle->cand_ip_detail_htable, (const unsigned char *)(&ip), sizeof(ip), NULL);
+        if(rtn < 0)
+        {
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+            return;
+        }
+        MGW_LOG_ERROR(handle->logger, "MESA_htable: Succeed at del, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+        FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_element_num, FS_OP_ADD, -1);
     }
 	return;
 }
@@ -332,8 +327,8 @@ static void Maat_cand_ip_finish_cb(void* args)
 {
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    Maat_feather_t feather = handle->feather;
     MGW_LOG_INFO(logger, "Maat_redis: finish callback, table is CAND_IP_TABLE");
+    //Maat_feather_t feather = handle->feather;
     /*
 	long long version=0;
 	int ret=0, is_last_updating_table = 0;
@@ -371,14 +366,16 @@ static int Maat_plugin_register(Maat_feather_t feather, const char* table_name, 
 }
 
 
-struct ip_mgr_handle *ip_mgr_init(void *logger, Maat_feather_t feather, struct htable_opts* opts)
+struct ip_mgr_handle *ip_mgr_init(MESA_htable_handle cand_ip_detail_htable, struct field_stat_handle *fs_handle, 
+                Maat_feather_t feather, struct htable_opts* opts, void *logger)
 {
     struct ip_mgr_handle *handle = ALLOC(struct ip_mgr_handle, 1); 
     handle->logger = logger;
     handle->feather = feather;
+    handle->fs_handle = fs_handle;
+    handle->cand_ip_detail_htable = cand_ip_detail_htable;
     handle->user_policy_htable = mgw_utils_create_htable("user_info_htable", opts, (void *)user_info_htable_data_free_cb, NULL);
-    handle->cand_ip_htable = mgw_utils_create_htable("cand_ip_htable", opts, (void *)cand_ip_htable_data_free_cb, NULL);
-    handle->ip_verify_htable = mgw_utils_create_htable("ip_verify_htable", opts, (void *)ip_verify_htable_data_free_cb, NULL);
+    handle->cand_ip_group_htable = mgw_utils_create_htable("cand_ip_group_htable", opts, (void *)cand_ip_group_htable_data_free_cb, NULL);
     int rtn = Maat_plugin_register(feather, "IR_POLICY", Maat_user_policy_start_cb, Maat_user_policy_update_cb, Maat_user_policy_finish_cb, handle);
     if(rtn == -1)
     {
@@ -394,9 +391,8 @@ struct ip_mgr_handle *ip_mgr_init(void *logger, Maat_feather_t feather, struct h
 
 void ip_mgr_destroy(struct ip_mgr_handle *handle)
 {
-    MESA_htable_destroy(handle->user_policy_htable, user_info_htable_data_free_cb);
-    MESA_htable_destroy(handle->cand_ip_htable, cand_ip_htable_data_free_cb);
-    MESA_htable_destroy(handle->ip_verify_htable, ip_verify_htable_data_free_cb);
+    MESA_htable_destroy(handle->user_policy_htable, NULL);
+    MESA_htable_destroy(handle->cand_ip_group_htable, NULL);
     FREE(&handle);
 }
 

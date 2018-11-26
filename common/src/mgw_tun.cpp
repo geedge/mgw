@@ -66,6 +66,7 @@ int mgw_tun_read(struct mgw_tun_handle *handle, char *buff, size_t len)
     {
         close(handle->fd);
         MGW_LOG_ERROR(logger, "mgw_tun: Failed at read from tun, errno is %d, %s\n", errno, strerror(errno));
+        exit(EXIT_FAILURE);
     }
     return recv_len;
  }
@@ -81,11 +82,13 @@ int mgw_tun_write(struct mgw_tun_handle *handle, char *buff, size_t len)
     }
     else
     {
-        if(send_len < len)
+        if((size_t)send_len < len)
         {
             close(handle->fd);
-            MGW_LOG_ERROR(logger, "mgw_tun: Failed at write to tun completely, need send %d but only send %d", len, send_len);
+            MGW_LOG_ERROR(logger, "mgw_tun: Failed at write to tun completely, need send %d but only send %d", (int)len, send_len);
+            exit(EXIT_FAILURE);
         }
     }
+    MGW_LOG_INFO(logger, "mgw_tun: Succeed at write to tun, len is %d", send_len);
     return send_len;
  }

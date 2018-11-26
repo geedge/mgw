@@ -49,4 +49,5 @@ target_link_libraries(test_htable pthread dl
 		MESA_handle_logger
 		MESA_prof_load
 		MESA_htable
+		MESA_field_stat
 		)

@@ -18,9 +18,10 @@ int mgw_socket_init()
     return socket_fd;
 }
 
-int mgw_socket_close(int socket_fd)
+void mgw_socket_close(int socket_fd)
 {
     close(socket_fd);
+    return;
 }
 
 
@@ -31,14 +32,14 @@ int mgw_socket_bind(int socket_fd, const char *ip, u_int16_t port)
     server.sin_port = htons(port);
     server.sin_addr.s_addr = inet_addr(ip);
     int rtn = bind(socket_fd, (struct sockaddr *)&server, sizeof(server));
-    return 0;
+    return rtn;
 }
    
 
-int mgw_socket_udp_recv(int socket_fd, char *buff)
+int mgw_socket_udp_recv(int socket_fd, char *buff, int buff_len)
 {
     struct sockaddr_in client;
     unsigned int client_len = sizeof(client);
-    int len = recvfrom(socket_fd, buff, sizeof(buff), 0, (struct sockaddr *) &client, &client_len);
+    int len = recvfrom(socket_fd, buff, buff_len, 0, (struct sockaddr *) &client, &client_len);
     return len;
 }
