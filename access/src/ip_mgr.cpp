@@ -84,7 +84,7 @@ int ip_mgr_candidata_ip_get(struct ip_mgr_handle *handle, const char *user_name,
     }
 }
 
-static void user_info_htable_data_free_cb(void *data)
+static void user_policy_htable_data_free_cb(void *data)
 {
     FREE(&data);
 }
@@ -145,13 +145,16 @@ static void Maat_user_policy_update_cb(int table_id, const char* table_line, voi
     {
         //add user_policy_htable
         int rtn = MESA_htable_add(handle->user_policy_htable, (const unsigned char *)user_name, key_size, value);
-        if(rtn < 0)
+        if(rtn < 0 && rtn != MESA_HTABLE_RET_DUP_ITEM)
         {
-            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at add, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at add, table is %s, user_name is %s, group_id is %d, rtn is %d", "user_policy_htable", user_name, group_id, rtn);
             return;
         }
-        MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at add, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
-        FS_operate(fs_handle->handle, fs_handle->line_user_policy, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
+        if(rtn >= 0)
+        {
+            MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at add, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+            FS_operate(fs_handle->handle, fs_handle->line_user_policy, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
+        }
     }
     else
     {
@@ -159,7 +162,7 @@ static void Maat_user_policy_update_cb(int table_id, const char* table_line, voi
         int rtn = MESA_htable_del(handle->user_policy_htable, (const unsigned char *)user_name, key_size, NULL);
         if(rtn < 0)
         {
-            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, table is %s, user_name is %s, group_id is %d, rtn is %d", "user_policy_htable", user_name, group_id, rtn);
             return;
         }
         MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at del, table is %s, user_name is %s, group_id is %d", "user_policy_htable", user_name, group_id);
@@ -234,7 +237,7 @@ static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* a
             int rtn = MESA_htable_add(handle->cand_ip_group_htable, (const unsigned char *)&group_id, sizeof(group_id), (void *)ip_group);
             if(rtn < 0)
             {
-                MGW_LOG_ERROR(logger, "MESA_htable: Failed at add, table is %s, group_id is %d, errno is %d", "cand_ip_group_htable", group_id, rtn);
+                MGW_LOG_ERROR(logger, "MESA_htable: Failed at add, table is %s, group_id is %d, rtn is %d", "cand_ip_group_htable", group_id, rtn);
                 return;
             }
             MGW_LOG_INFO(logger, "MESA_htable: Succeed at add, table is %s, group_id is %d", "cand_ip_group_htable", group_id);
@@ -271,13 +274,16 @@ static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* a
         
         //add to cand_ip_detail_htable
         int rtn = MESA_htable_add(handle->cand_ip_detail_htable, (const unsigned char *)&ip, sizeof(ip), (void *)_cand_ip);
-        if(rtn < 0)
+        if(rtn < 0 && rtn != MESA_HTABLE_RET_DUP_ITEM)
         {
-            MGW_LOG_ERROR(logger, "MESA_htable: Failed at add, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+            MGW_LOG_ERROR(logger, "MESA_htable: Failed at add, table is %s, ip is %s, rtn is %d", "cand_ip_detail_htable", rtn);
             return;
         }
-        MGW_LOG_INFO(logger, "MESA_htable: Succeed at add, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
-        FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
+        if(rtn >= 0)
+        {
+            MGW_LOG_INFO(logger, "MESA_htable: Succeed at add, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+            FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
+        }
     }
     else
     {
@@ -313,10 +319,10 @@ static void Maat_cand_ip_update_cb(int table_id, const char* table_line, void* a
         rtn = MESA_htable_del(handle->cand_ip_detail_htable, (const unsigned char *)(&ip), sizeof(ip), NULL);
         if(rtn < 0)
         {
-            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, table is %s, ip is %s, rtn is %d", "cand_ip_detail_htable", ip_addr, rtn);
             return;
         }
-        MGW_LOG_ERROR(handle->logger, "MESA_htable: Succeed at del, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
+        MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at del, table is %s, ip is %s", "cand_ip_detail_htable", ip_addr);
         FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_element_num, FS_OP_ADD, -1);
     }
 	return;
@@ -350,7 +356,7 @@ static int Maat_plugin_register(Maat_feather_t feather, const char* table_name, 
 	table_id = Maat_table_register(feather, table_name);
 	if(table_id == -1)
 	{
-        MGW_LOG_ERROR(logger, "Maat_redis: database table %s register failed", table_name);
+        MGW_LOG_ERROR(logger, "Maat_redis: Failed at register table %s", table_name);
         return -1;
 	}
 	else
@@ -358,7 +364,7 @@ static int Maat_plugin_register(Maat_feather_t feather, const char* table_name, 
 		ret = Maat_table_callback_register(feather, table_id, start, update, finish, (void *)handle);
 		if(ret < 0)
 		{
-            MGW_LOG_ERROR(logger, "Maat_redis: callback register table %s error", table_name);
+            MGW_LOG_ERROR(logger, "Maat_redis: Failed to register callback of table %s", table_name);
             return -1;
 		}
 	}
@@ -366,16 +372,16 @@ static int Maat_plugin_register(Maat_feather_t feather, const char* table_name, 
 }
 
 
-struct ip_mgr_handle *ip_mgr_init(MESA_htable_handle cand_ip_detail_htable, struct field_stat_handle *fs_handle, 
-                Maat_feather_t feather, struct htable_opts* opts, void *logger)
+struct ip_mgr_handle *ip_mgr_init(const char *profile, MESA_htable_handle cand_ip_detail_htable, struct field_stat_handle *fs_handle, 
+                Maat_feather_t feather, void *logger)
 {
     struct ip_mgr_handle *handle = ALLOC(struct ip_mgr_handle, 1); 
     handle->logger = logger;
     handle->feather = feather;
     handle->fs_handle = fs_handle;
     handle->cand_ip_detail_htable = cand_ip_detail_htable;
-    handle->user_policy_htable = mgw_utils_create_htable("user_info_htable", opts, (void *)user_info_htable_data_free_cb, NULL);
-    handle->cand_ip_group_htable = mgw_utils_create_htable("cand_ip_group_htable", opts, (void *)cand_ip_group_htable_data_free_cb, NULL);
+    handle->user_policy_htable = mgw_utils_create_htable(profile, "user_policy_htable", (void *)user_policy_htable_data_free_cb, NULL, logger);
+    handle->cand_ip_group_htable = mgw_utils_create_htable(profile, "cand_ip_group_htable", (void *)cand_ip_group_htable_data_free_cb, NULL, logger);
     int rtn = Maat_plugin_register(feather, "IR_POLICY", Maat_user_policy_start_cb, Maat_user_policy_update_cb, Maat_user_policy_finish_cb, handle);
     if(rtn == -1)
     {

@@ -48,7 +48,6 @@ void * thread_udp_server(void *args)
         int rtn = nat_dest_convert(_nat_handle, buff, len);
         if(rtn == NAT_COVERT_FAILURE)
         {
-            //MGW_LOG_INFO(logger, "Failed to nat_dest_convert");
             continue;
         }
         //write to tun

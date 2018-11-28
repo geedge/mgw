@@ -28,7 +28,7 @@ struct ip_mgr_vxlan_info
 };  
 
 struct ip_mgr_handle;
-struct ip_mgr_handle *ip_mgr_init(MESA_htable_handle cand_ip_detail_htable, struct field_stat_handle *fs_handle, 
-                Maat_feather_t feather, struct htable_opts* opts, void *logger);
+struct ip_mgr_handle *ip_mgr_init(const char *profile, MESA_htable_handle cand_ip_detail_htable, struct field_stat_handle *fs_handle, 
+                Maat_feather_t feather, void *logger);
 void ip_mgr_destroy(struct ip_mgr_handle *handle);
 int ip_mgr_candidata_ip_get(struct ip_mgr_handle *handle, const char *user_name, uint32_t *selected_ip);

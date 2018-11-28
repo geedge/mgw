@@ -34,7 +34,7 @@ static long ip2user_cb_to_del_key(void *data, const uchar *key, uint size, void 
         FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
         MGW_LOG_INFO(handle->logger, "MESA_htable: key existed, table is %s, key is %s", "ip2user_htable", _key);
         int rtn = MESA_htable_del(handle->ip2user_htable, key, size, NULL);
-        if(rtn != 0)
+        if(rtn < 0)
         {
             MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, errno is %d, table is %s, key is %s", rtn, "ip2user_htable", _key);
             return HTABLE_QUERY_CB_FAILURE;

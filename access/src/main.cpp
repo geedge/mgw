@@ -19,7 +19,6 @@ struct mgw_handle
     void* logger;
     char *profile;
     Maat_feather_t Maat_feather;
-    struct htable_opts *htable_opts_s;
 	struct mgw_tun_handle *mgw_tun_handle_s;
 	struct nat_handle *nat_handle_s;
     struct ip_mgr_handle *ip_mgr_handle_s;
@@ -34,7 +33,7 @@ static void wrapped_Maat_set_feather_opt(void *logger, Maat_feather_t feather, e
     int rtn = Maat_set_feather_opt(feather, type, value, size);
     if(unlikely(rtn < 0))
     {
-        MGW_LOG_ERROR(logger, "Failed at Maat_set_feather_opt, type is %d", type);
+        MGW_LOG_ERROR(logger, "Failed at Maat_set_feather_opt, type is %d, rtn is %d", type, rtn);
         exit(EXIT_FAILURE);
     }
 }
@@ -53,7 +52,8 @@ static Maat_feather_t  Maat_init(const char *profile, void *logger)
     MESA_load_profile_string_def(profile, section, "Maat_redis_ip", Maat_redis_ip, sizeof(Maat_redis_ip), "127.0.0.1");
     MESA_load_profile_int_def(profile, section, "Maat_redis_port", &Maat_redis_port, 6379);
     MESA_load_profile_string_def(profile, section, "stat_file_path", stat_file_path, sizeof(stat_file_path), "./log/Maat_stat.log");
-    MGW_LOG_INFO(logger, "MESA_prof_load, [%s]:\n table_info_path: %s\n max_thread_num: %d\n Maat_redis_ip: %s\n Maat_redis_port: %d\n stat_file_path: %s", "Maat", table_info_path, max_thread_num, Maat_redis_ip, Maat_redis_port, stat_file_path);
+    MGW_LOG_INFO(logger, "MESA_prof_load, [%s]:\n table_info_path: %s\n max_thread_num: %d\n Maat_redis_ip: %s\n Maat_redis_port: %d\n stat_file_path: %s", "Maat", 
+        table_info_path, max_thread_num, Maat_redis_ip, Maat_redis_port, stat_file_path);
     // init Maat
     Maat_feather_t feather = NULL;
     feather = Maat_feather(max_thread_num, table_info_path, logger);
@@ -79,20 +79,6 @@ static Maat_feather_t  Maat_init(const char *profile, void *logger)
 		exit(EXIT_FAILURE);
     }
     return feather;
-}
-
-static struct htable_opts * htable_opt_init(const char* profile, void *logger)
-{
-    struct htable_opts* _htable_opts = ALLOC(struct htable_opts, 1);
-    const char *section = "htable_opt";
-    MESA_load_profile_int_def(profile, section, "mho_screen_print_ctrl", &(_htable_opts->mho_screen_print_ctrl), 0);
-    MESA_load_profile_int_def(profile, section, "mho_thread_safe", &(_htable_opts->mho_thread_safe), 1);
-    MESA_load_profile_int_def(profile, section, "mho_mutex_num", &(_htable_opts->mho_mutex_num), 16);
-    MESA_load_profile_int_def(profile, section, "mho_hash_slot_size", &(_htable_opts->mho_hash_slot_size), 16000);
-    MESA_load_profile_int_def(profile, section, "mho_expire_time", &(_htable_opts->mho_expire_time), 0);
-    MGW_LOG_INFO(logger, "MESA_prof_load, [%s]:\n mho_screen_print_ctrl: %d\n mho_thread_safe: %d\n mho_mutex_num: %d\n mho_hash_slot_size: %d\n mho_expire_time: %d", 
-        "htable_opt", _htable_opts->mho_screen_print_ctrl, _htable_opts->mho_thread_safe, _htable_opts->mho_mutex_num, _htable_opts->mho_hash_slot_size, _htable_opts->mho_expire_time);
-    return _htable_opts;
 }
 
 static void ip2user_htable_data_free_cb(void *data)
@@ -286,10 +272,6 @@ static struct mgw_handle * mgw_init()
     _mgw_handle->logger = logger;
     _mgw_handle->profile = (char *)profile;
 
-    //init htable_opt
-    struct htable_opts * _htable_opts = htable_opt_init(profile, logger);
-    _mgw_handle->htable_opts_s = _htable_opts;
-
     //init feild_stat
     struct field_stat_handle *fs_handle = fs_init(profile, logger);
     _mgw_handle->fs_handle = fs_handle;
@@ -302,14 +284,14 @@ static struct mgw_handle * mgw_init()
     _mgw_handle->mgw_tun_handle_s = mgw_tun_init("tun_mgw", logger);
 
     //init ip_mgr
-    MESA_htable_handle cand_ip_detail_htable = mgw_utils_create_htable("cand_ip_detail_htable", _mgw_handle->htable_opts_s, (void *)cand_ip_detail_htable_data_free_cb, NULL);
+    MESA_htable_handle cand_ip_detail_htable = mgw_utils_create_htable(profile, "cand_ip_detail_htable", (void *)cand_ip_detail_htable_data_free_cb, NULL, logger);
     if(cand_ip_detail_htable == NULL)
     {
         MGW_LOG_ERROR(logger, "Failed at create cand_ip_detail_htable");
         exit(EXIT_FAILURE);
     }
     _mgw_handle->cand_ip_detail_htable = cand_ip_detail_htable;
-    struct ip_mgr_handle * _ip_mgr_handle = ip_mgr_init(cand_ip_detail_htable, fs_handle, Maat_feather, _htable_opts, logger);
+    struct ip_mgr_handle * _ip_mgr_handle = ip_mgr_init(profile, cand_ip_detail_htable, fs_handle, Maat_feather, logger);
     if(unlikely(_ip_mgr_handle == NULL))
     {
         MGW_LOG_ERROR(logger, "Failed at init_ip_mgr");
@@ -319,14 +301,14 @@ static struct mgw_handle * mgw_init()
 
 
     //init nat
-    MESA_htable_handle ip2user_htable = mgw_utils_create_htable("ip2user_htable", _mgw_handle->htable_opts_s, (void *)ip2user_htable_data_free_cb, NULL);
+    MESA_htable_handle ip2user_htable = mgw_utils_create_htable(profile, "ip2user_htable", (void *)ip2user_htable_data_free_cb, NULL, logger);
     if(ip2user_htable == NULL)
     {
         MGW_LOG_ERROR(logger, "Failed at create ip2user_htable");
         exit(EXIT_FAILURE);
     }
     _mgw_handle->ip2user_htable = ip2user_htable;
-    _mgw_handle->nat_handle_s = nat_init(ip2user_htable, cand_ip_detail_htable, fs_handle, _htable_opts, logger);
+    _mgw_handle->nat_handle_s = nat_init(profile, ip2user_htable, cand_ip_detail_htable, fs_handle, logger);
 
 
     //create thread_vpn_monitor
@@ -368,7 +350,6 @@ static void mgw_destroy(struct mgw_handle *handle)
 {
     MESA_destroy_runtime_log_handle(handle->logger);
     FREE(&handle->profile);
-    FREE(&handle->htable_opts_s);
     Maat_burn_feather(handle->Maat_feather);
     MESA_htable_destroy(handle->cand_ip_detail_htable, NULL);
     MESA_htable_destroy(handle->ip2user_htable, NULL);
@@ -377,6 +358,7 @@ static void mgw_destroy(struct mgw_handle *handle)
     ip_mgr_destroy(handle->ip_mgr_handle_s);
     FREE(&handle->udp_client_handle_s);
     FS_stop(&handle->fs_handle->handle);
+    FREE(&handle->fs_handle);
     FREE(&handle);
 }
 
@@ -404,6 +386,10 @@ static void mgw_run(struct mgw_handle *handle)
     sleep(10);
     struct timespec start_time, end_time;
     struct field_stat_handle *fs_handle = handle->fs_handle;
+    //for test
+    //struct timespec _start_time;
+    //clock_gettime(CLOCK_MONOTONIC, &_start_time);
+
 
     while(1)
     {
@@ -428,6 +414,10 @@ static void mgw_run(struct mgw_handle *handle)
         long long cost_time;
         cost_time = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_nsec - start_time.tv_nsec) / 1000;
         FS_operate(fs_handle->handle, fs_handle->snat_latency, 0, FS_OP_SET, cost_time);
+
+        //for test
+        //if(end_time.tv_sec - _start_time.tv_sec > 60)
+            //break;
     }
 }
 

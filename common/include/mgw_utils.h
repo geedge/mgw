@@ -42,17 +42,9 @@ do { 												\
 #define MGW_LOG_DEBUG(handler, fmt, ...)															\
 do { MESA_handle_runtime_log(handler, RLOG_LV_DEBUG, "mgw", fmt, ##__VA_ARGS__); } while(0)			
 
-struct htable_opts
-{
-    int mho_screen_print_ctrl;
-    int mho_thread_safe;
-    int mho_mutex_num;
-    int mho_hash_slot_size;
-    int mho_expire_time;
-	void *logger;
-};
+
 //fprintf(stderr, fmt "\n", ##__VA_ARGS__);
-MESA_htable_handle mgw_utils_create_htable(const char *symbol, struct htable_opts *_htable_opts, void *free_data_cb, void *expire_notify_cb);
+MESA_htable_handle mgw_utils_create_htable(const char *profile, const char *section, void *free_data_cb, void *expire_notify_cb, void *logger);
 
 
 struct field_stat_handle

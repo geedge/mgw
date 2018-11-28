@@ -68,6 +68,7 @@ int mgw_tun_read(struct mgw_tun_handle *handle, char *buff, size_t len)
         MGW_LOG_ERROR(logger, "mgw_tun: Failed at read from tun, errno is %d, %s\n", errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
+    MGW_LOG_INFO(logger, "mgw_tun: Succeed at read from tun, len is %d", recv_len);
     return recv_len;
  }
 
