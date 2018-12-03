@@ -193,10 +193,9 @@ static void Maat_user_policy_finish_cb(void* args)
 
 static void Maat_cand_ip_start_cb(int update_type,void* args)
 {
-    printf("Maat_cand_ip_start_cb:  update_type is %d\n", update_type);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: start callback, table is CAND_IP_TABLE");
+    MGW_LOG_INFO(logger, "Maat_redis: start callback, table is CAND_IP_TABLE, updata_type is %d\n", update_type);
 	return;
 }
 
