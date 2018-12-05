@@ -7,7 +7,8 @@
 struct ip_mgr_handle
 {
     void *logger;
-    Maat_feather_t feather;
+    Maat_feather_t Maat_feather_cand;
+    Maat_feather_t Maat_feather_policy;
     MESA_htable_handle user_policy_htable;  //expire_time: 0
     MESA_htable_handle cand_ip_group_htable; //expire_time: 0
     MESA_htable_handle cand_ip_detail_htable; //expire_time: 0
@@ -134,9 +135,16 @@ static void Maat_user_policy_update_cb(int table_id, const char* table_line, voi
     void *logger = handle->logger;
     struct field_stat_handle *fs_handle = handle->fs_handle;
     MGW_LOG_INFO(logger, "Maat_redis: update callback, table is USER_POLICY_TABLE");
-    int config_id, group_id, user_type, is_valid;
+    int config_id, group_id, is_valid;
+    char user_type[MGW_SYMBOL_MAX];
     char user_name[MGW_SYMBOL_MAX];
-    sscanf(table_line, "%d %d %d %s %d", &config_id, &group_id, &user_type, user_name, &is_valid);
+    char translate_param[MGW_STRING_MAX];
+    int do_log;
+    int action;
+    int service_id;
+    printf("table line is %s\n", table_line);
+    sscanf(table_line, "%d %d %s %s %s %d %d %d %d", &config_id, &group_id, user_type, user_name, translate_param, &do_log, &action, &service_id, &is_valid);
+    printf("user name is %s\n", user_name);
     struct user_policy_htable_value *value = ALLOC(struct user_policy_htable_value, 1);
     strncpy(value->user_name, user_name, MGW_SYMBOL_MAX);
     value->group_id = group_id;
@@ -372,21 +380,22 @@ static int Maat_plugin_register(Maat_feather_t feather, const char* table_name, 
 
 
 struct ip_mgr_handle *ip_mgr_init(const char *profile, MESA_htable_handle cand_ip_detail_htable, struct field_stat_handle *fs_handle, 
-                Maat_feather_t feather, void *logger)
+                Maat_feather_t Maat_feather_cand, Maat_feather_t Maat_feather_policy, void *logger)
 {
     struct ip_mgr_handle *handle = ALLOC(struct ip_mgr_handle, 1); 
     handle->logger = logger;
-    handle->feather = feather;
+    handle->Maat_feather_cand = Maat_feather_cand;
+    handle->Maat_feather_policy = Maat_feather_policy;
     handle->fs_handle = fs_handle;
     handle->cand_ip_detail_htable = cand_ip_detail_htable;
     handle->user_policy_htable = mgw_utils_create_htable(profile, "user_policy_htable", (void *)user_policy_htable_data_free_cb, NULL, logger);
     handle->cand_ip_group_htable = mgw_utils_create_htable(profile, "cand_ip_group_htable", (void *)cand_ip_group_htable_data_free_cb, NULL, logger);
-    int rtn = Maat_plugin_register(feather, "IR_POLICY", Maat_user_policy_start_cb, Maat_user_policy_update_cb, Maat_user_policy_finish_cb, handle);
+    int rtn = Maat_plugin_register(Maat_feather_policy, "IR_SNAT_POLICY", Maat_user_policy_start_cb, Maat_user_policy_update_cb, Maat_user_policy_finish_cb, handle);
     if(rtn == -1)
     {
         return NULL;   
     }
-    rtn = Maat_plugin_register(feather, "IR_CANDIDATE_IP", Maat_cand_ip_start_cb, Maat_cand_ip_update_cb, Maat_cand_ip_finish_cb, handle);
+    rtn = Maat_plugin_register(Maat_feather_cand, "IR_CANDIDATE_IP", Maat_cand_ip_start_cb, Maat_cand_ip_update_cb, Maat_cand_ip_finish_cb, handle);
     if(rtn == -1)
     {
         return NULL;

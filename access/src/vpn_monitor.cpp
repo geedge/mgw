@@ -126,7 +126,7 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
                     server_ip, server_port, server_passwd, hub_name, hub_passwd);
 
         //get_iptables_cmd
-        //printf("get_iptables_cmd: %s\n", get_iptables_cmd);
+        printf("get_iptables_cmd: %s\n", get_iptables_cmd);
         FILE *get_iptables_fp = popen(get_iptables_cmd, "r");
         if(get_iptables_fp == NULL)
         {
@@ -214,7 +214,7 @@ void * thread_vpn_monitor(void* args)
     {
         //printf("vpn monitor--------------\n");
         get_ip2user_by_vpncmd(handle);
-        sleep(3600);
+        sleep(60);
     }
     return NULL;
 }

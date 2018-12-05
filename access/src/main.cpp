@@ -18,7 +18,8 @@ struct mgw_handle
 {
     void* logger;
     char *profile;
-    Maat_feather_t Maat_feather;
+    Maat_feather_t Maat_feather_cand;
+    Maat_feather_t Maat_feather_policy;
 	struct mgw_tun_handle *mgw_tun_handle_s;
 	struct nat_handle *nat_handle_s;
     struct ip_mgr_handle *ip_mgr_handle_s;
@@ -38,22 +39,23 @@ static void wrapped_Maat_set_feather_opt(void *logger, Maat_feather_t feather, e
     }
 }
 
-static Maat_feather_t  Maat_init(const char *profile, void *logger)
+static Maat_feather_t  Maat_init(const char *profile, const char *section, void *logger)
 {
     // load conf
-    const char *section = "Maat";
     char table_info_path[MGW_PATH_MAX];
     int max_thread_num;
     char Maat_redis_ip[MGW_SYMBOL_MAX];
     int Maat_redis_port;
+    int Maat_redis_index;
     char stat_file_path[MGW_PATH_MAX];
     MESA_load_profile_string_def(profile, section, "table_info_path", table_info_path, sizeof(table_info_path), "./conf/table_info.conf");
     MESA_load_profile_int_def(profile, section, "max_thread_num", &max_thread_num, 1);
     MESA_load_profile_string_def(profile, section, "Maat_redis_ip", Maat_redis_ip, sizeof(Maat_redis_ip), "127.0.0.1");
     MESA_load_profile_int_def(profile, section, "Maat_redis_port", &Maat_redis_port, 6379);
+    MESA_load_profile_int_def(profile, section, "Maat_redis_index", &Maat_redis_index, 1);
     MESA_load_profile_string_def(profile, section, "stat_file_path", stat_file_path, sizeof(stat_file_path), "./log/Maat_stat.log");
-    MGW_LOG_INFO(logger, "MESA_prof_load, [%s]:\n table_info_path: %s\n max_thread_num: %d\n Maat_redis_ip: %s\n Maat_redis_port: %d\n stat_file_path: %s", "Maat", 
-        table_info_path, max_thread_num, Maat_redis_ip, Maat_redis_port, stat_file_path);
+    MGW_LOG_INFO(logger, "MESA_prof_load, [%s]:\n table_info_path: %s\n max_thread_num: %d\n Maat_redis_ip: %s\n Maat_redis_port: %d\n Maat_redis_index: %d\n"
+    "stat_file_path: %s", section, table_info_path, max_thread_num, Maat_redis_ip, Maat_redis_port, Maat_redis_index, stat_file_path);
     // init Maat
     Maat_feather_t feather = NULL;
     feather = Maat_feather(max_thread_num, table_info_path, logger);
@@ -65,6 +67,7 @@ static Maat_feather_t  Maat_init(const char *profile, void *logger)
     wrapped_Maat_set_feather_opt(logger, feather, MAAT_OPT_INSTANCE_NAME, "mgw", strlen("mgw")+1);
 	wrapped_Maat_set_feather_opt(logger, feather, MAAT_OPT_REDIS_IP, Maat_redis_ip, strlen(Maat_redis_ip)+1);
 	wrapped_Maat_set_feather_opt(logger, feather, MAAT_OPT_REDIS_PORT, &Maat_redis_port, sizeof(Maat_redis_port));
+    wrapped_Maat_set_feather_opt(logger, feather, MAAT_OPT_REDIS_INDEX, &Maat_redis_index, sizeof(Maat_redis_index));
     //wrapped_Maat_set_feather_opt(logger, feather, MAAT_OPT_STAT_FILE_PATH, stat_file_path, strlen(stat_file_path)+1);
     //wrapped_Maat_set_feather_opt(logger, feather, MAAT_OPT_STAT_ON, NULL, 0);
 	//wrapped_Maat_set_feather_opt(logger, feather, MAAT_OPT_PERF_ON, NULL, 0);
@@ -277,8 +280,10 @@ static struct mgw_handle * mgw_init()
     _mgw_handle->fs_handle = fs_handle;
 
     //init Maat
-    Maat_feather_t Maat_feather = Maat_init((const char *)profile, logger);
-    _mgw_handle->Maat_feather = Maat_feather;
+    Maat_feather_t Maat_feather_cand = Maat_init((const char *)profile, "Maat_cand", logger);
+    Maat_feather_t Maat_feather_policy = Maat_init((const char *)profile, "Maat_policy", logger);
+    _mgw_handle->Maat_feather_cand = Maat_feather_cand;
+    _mgw_handle->Maat_feather_policy = Maat_feather_policy;
 
     //init tun
     _mgw_handle->mgw_tun_handle_s = mgw_tun_init("tun_mgw", logger);
@@ -291,7 +296,7 @@ static struct mgw_handle * mgw_init()
         exit(EXIT_FAILURE);
     }
     _mgw_handle->cand_ip_detail_htable = cand_ip_detail_htable;
-    struct ip_mgr_handle * _ip_mgr_handle = ip_mgr_init(profile, cand_ip_detail_htable, fs_handle, Maat_feather, logger);
+    struct ip_mgr_handle * _ip_mgr_handle = ip_mgr_init(profile, cand_ip_detail_htable, fs_handle, Maat_feather_cand, Maat_feather_policy, logger);
     if(unlikely(_ip_mgr_handle == NULL))
     {
         MGW_LOG_ERROR(logger, "Failed at init_ip_mgr");
@@ -350,7 +355,8 @@ static void mgw_destroy(struct mgw_handle *handle)
 {
     MESA_destroy_runtime_log_handle(handle->logger);
     FREE(&handle->profile);
-    Maat_burn_feather(handle->Maat_feather);
+    Maat_burn_feather(handle->Maat_feather_cand);
+    Maat_burn_feather(handle->Maat_feather_policy);
     MESA_htable_destroy(handle->cand_ip_detail_htable, NULL);
     MESA_htable_destroy(handle->ip2user_htable, NULL);
     mgw_tun_destroy(handle->mgw_tun_handle_s);
