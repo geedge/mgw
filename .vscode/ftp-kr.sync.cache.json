@@ -3,294 +3,6 @@
     "root": {
       "IPReuse": {
         "mgw": {
-          "common": {
-            "include": {
-              "mgw_utils.h": {
-                "type": "-",
-                "size": 2409,
-                "lmtime": 1543324367843,
-                "modified": false
-              },
-              "tun.h": {
-                "type": "-",
-                "size": 294,
-                "lmtime": 1541750944509,
-                "modified": false
-              },
-              "mgw_socket.h": {
-                "type": "-",
-                "size": 280,
-                "lmtime": 1542803512494,
-                "modified": false
-              },
-              "mgw_tun.h": {
-                "type": "-",
-                "size": 335,
-                "lmtime": 1542337427911,
-                "modified": false
-              }
-            },
-            "CMakeLists.txt": {
-              "type": "-",
-              "size": 197,
-              "lmtime": 1542267283818,
-              "modified": false
-            },
-            "src": {
-              "mgw_utils.cpp": {
-                "type": "-",
-                "size": 6240,
-                "lmtime": 1543324108185,
-                "modified": false
-              },
-              "tun.cpp": {
-                "type": "-",
-                "size": 2742,
-                "lmtime": 1541750772819,
-                "modified": false
-              },
-              "mgw_socket.cpp": {
-                "type": "-",
-                "size": 1222,
-                "lmtime": 1542803548144,
-                "modified": false
-              },
-              "mgw_tun.cpp": {
-                "type": "-",
-                "size": 2598,
-                "lmtime": 1543374190079,
-                "modified": false
-              }
-            },
-            "CMakeFiles": {},
-            "Makefile": {
-              "type": "-",
-              "size": 6174,
-              "lmtime": 0,
-              "modified": true
-            },
-            "cmake_install.cmake": {
-              "type": "-",
-              "size": 1114,
-              "lmtime": 0,
-              "modified": false
-            },
-            "libcommon.a": {
-              "type": "-",
-              "size": 9328,
-              "lmtime": 0,
-              "modified": true
-            }
-          },
-          "README.md": {
-            "type": "-",
-            "size": 26,
-            "lmtime": 1540888536383,
-            "modified": false
-          },
-          "access": {
-            "CMakeLists.txt": {
-              "type": "-",
-              "size": 1421,
-              "lmtime": 1542874405065,
-              "modified": false
-            },
-            "include": {
-              "vpn_monitor.h": {
-                "type": "-",
-                "size": 205,
-                "lmtime": 1543236257323,
-                "modified": false
-              },
-              "nat.cpp": {
-                "type": "-",
-                "size": 0,
-                "lmtime": 1541751728308,
-                "modified": false
-              },
-              "nat.h": {
-                "type": "-",
-                "size": 561,
-                "lmtime": 1543324682605,
-                "modified": false
-              },
-              "ip_mgr.h": {
-                "type": "-",
-                "size": 1191,
-                "lmtime": 1543325691334,
-                "modified": false
-              },
-              "udp_server.h": {
-                "type": "-",
-                "size": 225,
-                "lmtime": 1542964765077,
-                "modified": false
-              }
-            },
-            "src": {
-              "main.cpp": {
-                "type": "-",
-                "size": 16638,
-                "lmtime": 1543409951644,
-                "modified": false
-              },
-              "tun.cpp": {
-                "type": "-",
-                "size": 2734,
-                "lmtime": 1541164401820,
-                "modified": false
-              },
-              "vpn_monitor.cpp": {
-                "type": "-",
-                "size": 9249,
-                "lmtime": 1543372925586,
-                "modified": false
-              },
-              "nat.cpp": {
-                "type": "-",
-                "size": 23249,
-                "lmtime": 1543410118010,
-                "modified": false
-              },
-              "ip_translator.cpp": {
-                "type": "-",
-                "size": 0,
-                "lmtime": 1541664138444,
-                "modified": false
-              },
-              "ip_manager.cpp": {
-                "type": "-",
-                "size": 0,
-                "lmtime": 1541751456565,
-                "modified": false
-              },
-              "ip_pool_mgr.cpp": {
-                "type": "-",
-                "size": 0,
-                "lmtime": 1541751709640,
-                "modified": false
-              },
-              "ip_mgr.cpp": {
-                "type": "-",
-                "size": 17432,
-                "lmtime": 1543461860280,
-                "modified": false
-              },
-              "udp_server.cpp": {
-                "type": "-",
-                "size": 2491,
-                "lmtime": 1543320908556,
-                "modified": false
-              },
-              "status_monitor.cpp": {
-                "type": "-",
-                "size": 3267,
-                "lmtime": 1542873603316,
-                "modified": false
-              }
-            },
-            "test": {
-              "test_maat_redis.cpp": {
-                "type": "-",
-                "size": 5515,
-                "lmtime": 1542703778965,
-                "modified": false
-              },
-              "test_tun.cpp": {
-                "type": "-",
-                "size": 3123,
-                "lmtime": 1542176058502,
-                "modified": false
-              },
-              "test_MESA_htable.cpp": {
-                "type": "-",
-                "size": 3966,
-                "lmtime": 1543216225110,
-                "modified": false
-              }
-            },
-            "CMakeFiles": {},
-            "Makefile": {
-              "type": "-",
-              "size": 13421,
-              "lmtime": 0,
-              "modified": true
-            },
-            "cmake_install.cmake": {
-              "type": "-",
-              "size": 1119,
-              "lmtime": 0,
-              "modified": true
-            },
-            "log": {},
-            "test_htable": {
-              "type": "-",
-              "size": 8584,
-              "lmtime": 0,
-              "modified": true
-            },
-            "test_tun": {
-              "type": "-",
-              "size": 13584,
-              "lmtime": 0,
-              "modified": true
-            },
-            "test_maat_redis": {
-              "type": "-",
-              "size": 13696,
-              "lmtime": 0,
-              "modified": false
-            },
-            "mgw": {
-              "type": "-",
-              "size": 56312,
-              "lmtime": 0,
-              "modified": true
-            },
-            "conf": {},
-            "rulescan_tmp": {}
-          },
-          "vendor": {
-            "CMakeLists.txt": {
-              "type": "-",
-              "size": 1741,
-              "lmtime": 1540969696627,
-              "modified": false
-            },
-            "maat-v2.3.3.tar.gz": {
-              "type": "-",
-              "size": 1920396,
-              "lmtime": 1540888536391,
-              "modified": false
-            }
-          },
-          "build": {},
-          "conf": {
-            "table_info.conf": {
-              "type": "-",
-              "size": 633,
-              "lmtime": 1542702676007,
-              "modified": false
-            },
-            "mgw.conf": {
-              "type": "-",
-              "size": 1581,
-              "lmtime": 1543323941481,
-              "modified": false
-            }
-          },
-          "CMakeLists.txt": {
-            "type": "-",
-            "size": 459,
-            "lmtime": 1542863950666,
-            "modified": false
-          },
-          "create_tun.sh": {
-            "type": "-",
-            "size": 324,
-            "lmtime": 1543460762526,
-            "modified": false
-          },
           ".gitignore.swp": {
             "type": "-",
             "size": 4096,
@@ -302,6 +14,222 @@
             "size": 18,
             "lmtime": 1543411187230,
             "modified": false
+          },
+          "conf": {
+            "table_info.conf": {
+              "type": "-",
+              "size": 638,
+              "lmtime": 1544172494281,
+              "modified": false
+            },
+            "mgw.conf": {
+              "type": "-",
+              "size": 1581,
+              "lmtime": 1544172394868,
+              "modified": false
+            },
+            ".mgw.conf.swp": {
+              "type": "-",
+              "size": 4096,
+              "lmtime": 1544172426840,
+              "modified": false
+            },
+            ".table_info.conf.swp": {
+              "type": "-",
+              "size": 4096,
+              "lmtime": 1544172466147,
+              "modified": false
+            }
+          },
+          "access": {
+            "src": {
+              "dnat.cpp": {
+                "type": "-",
+                "size": 23249,
+                "lmtime": 1544172317408,
+                "modified": false
+              },
+              "snat.cpp": {
+                "type": "-",
+                "size": 23249,
+                "lmtime": 1544172317406,
+                "modified": false
+              },
+              "ip_mgr.cpp": {
+                "type": "-",
+                "size": 17898,
+                "lmtime": 1543461860280,
+                "modified": true
+              },
+              "vpn_monitor.cpp": {
+                "type": "-",
+                "size": 9245,
+                "lmtime": 1543372925586,
+                "modified": true
+              },
+              "udp_server.cpp": {
+                "type": "-",
+                "size": 2491,
+                "lmtime": 1544172317405,
+                "modified": false
+              },
+              "main.cpp": {
+                "type": "-",
+                "size": 17213,
+                "lmtime": 1543409951644,
+                "modified": true
+              },
+              ".main.cpp.swp": {
+                "type": "-",
+                "size": 4096,
+                "lmtime": 1544172317408,
+                "modified": false
+              },
+              "nat.cpp": {
+                "type": "-",
+                "size": 23249,
+                "lmtime": 1544172251000,
+                "modified": false
+              },
+              ".main.cpp.swo": {
+                "type": "-",
+                "size": 4096,
+                "lmtime": 1544172337018,
+                "modified": false
+              }
+            },
+            "include": {
+              "ip_mgr.h": {
+                "type": "-",
+                "size": 1191,
+                "lmtime": 1544172317404,
+                "modified": false
+              },
+              "nat.h": {
+                "type": "-",
+                "size": 561,
+                "lmtime": 1544172250998,
+                "modified": false
+              },
+              "udp_server.h": {
+                "type": "-",
+                "size": 225,
+                "lmtime": 1544172250998,
+                "modified": false
+              },
+              "vpn_monitor.h": {
+                "type": "-",
+                "size": 205,
+                "lmtime": 1544172250999,
+                "modified": false
+              }
+            },
+            "CMakeLists.txt": {
+              "type": "-",
+              "size": 1421,
+              "lmtime": 1544172250997,
+              "modified": false
+            },
+            "test": {
+              "test_MESA_htable.cpp": {
+                "type": "-",
+                "size": 3966,
+                "lmtime": 1544172251002,
+                "modified": false
+              },
+              "test_maat_redis.cpp": {
+                "type": "-",
+                "size": 5515,
+                "lmtime": 1544172251002,
+                "modified": false
+              },
+              "test_tun.cpp": {
+                "type": "-",
+                "size": 3123,
+                "lmtime": 1544172251002,
+                "modified": false
+              }
+            }
+          },
+          "common": {
+            "src": {
+              "mgw_utils.cpp": {
+                "type": "-",
+                "size": 6240,
+                "lmtime": 1544172389047,
+                "modified": false
+              },
+              "mgw_socket.cpp": {
+                "type": "-",
+                "size": 1222,
+                "lmtime": 1544172251005,
+                "modified": false
+              },
+              "mgw_tun.cpp": {
+                "type": "-",
+                "size": 2598,
+                "lmtime": 1544172251005,
+                "modified": false
+              }
+            },
+            "include": {
+              "mgw_utils.h": {
+                "type": "-",
+                "size": 2409,
+                "lmtime": 1544172389047,
+                "modified": false
+              },
+              "mgw_socket.h": {
+                "type": "-",
+                "size": 280,
+                "lmtime": 1544172251003,
+                "modified": false
+              },
+              "mgw_tun.h": {
+                "type": "-",
+                "size": 335,
+                "lmtime": 1544172251004,
+                "modified": false
+              }
+            },
+            "CMakeLists.txt": {
+              "type": "-",
+              "size": 197,
+              "lmtime": 1544172251003,
+              "modified": false
+            }
+          },
+          "CMakeLists.txt": {
+            "type": "-",
+            "size": 459,
+            "lmtime": 1542863950666,
+            "modified": false
+          },
+          "README.md": {
+            "type": "-",
+            "size": 26,
+            "lmtime": 1540888536383,
+            "modified": false
+          },
+          "create_tun.sh": {
+            "type": "-",
+            "size": 324,
+            "lmtime": 1544172251016,
+            "modified": false
+          },
+          "vendor": {
+            "CMakeLists.txt": {
+              "type": "-",
+              "size": 1741,
+              "lmtime": 1544172251022,
+              "modified": false
+            },
+            "maat-v2.3.3.tar.gz": {
+              "type": "-",
+              "size": 1920396,
+              "lmtime": 1544172251038,
+              "modified": false
+            }
           }
         }
       }
