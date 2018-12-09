@@ -250,11 +250,12 @@ static struct field_stat_handle * fs_init(const char *profile, void *logger)
 }
 
 
-static struct mgw_handle * mgw_init()
+static struct mgw_handle * mgw_init(char *conf_path)
 {
     struct mgw_handle *_mgw_handle = ALLOC(struct mgw_handle, 1);
     char *profile = ALLOC(char, MGW_SYMBOL_MAX);
-    strncpy(profile, "./conf/mgw.conf", MGW_SYMBOL_MAX);
+    strncpy(profile, conf_path, MGW_SYMBOL_MAX);
+    printf("profile is %s\n", profile);
 	const char *section = "global";
 
     //init srand
@@ -429,7 +430,12 @@ static void mgw_run(struct mgw_handle *handle)
 
 int main(int argc, char* argv[])
 {
-    struct mgw_handle *handle = mgw_init();
+    char *conf_path = (char *)"./conf/mgw.conf";
+    if(argc > 1)
+    {
+        conf_path = argv[1];
+    }
+    struct mgw_handle *handle = mgw_init(conf_path);
     mgw_run(handle);
     mgw_destroy(handle);
 }

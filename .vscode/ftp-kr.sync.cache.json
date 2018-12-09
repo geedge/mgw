@@ -24,8 +24,8 @@
             },
             "mgw.conf": {
               "type": "-",
-              "size": 1581,
-              "lmtime": 1544172394868,
+              "size": 1869,
+              "lmtime": 1544358511216,
               "modified": false
             },
             ".mgw.conf.swp": {
@@ -38,6 +38,12 @@
               "type": "-",
               "size": 4096,
               "lmtime": 1544172466147,
+              "modified": false
+            },
+            "dev.conf": {
+              "type": "-",
+              "size": 72,
+              "lmtime": 1544355090373,
               "modified": false
             }
           },
@@ -63,21 +69,15 @@
               },
               "vpn_monitor.cpp": {
                 "type": "-",
-                "size": 9245,
-                "lmtime": 1543372925586,
-                "modified": true
+                "size": 9247,
+                "lmtime": 1544360519242,
+                "modified": false
               },
               "udp_server.cpp": {
                 "type": "-",
                 "size": 2491,
                 "lmtime": 1544172317405,
                 "modified": false
-              },
-              "main.cpp": {
-                "type": "-",
-                "size": 17213,
-                "lmtime": 1543409951644,
-                "modified": true
               },
               ".main.cpp.swp": {
                 "type": "-",
@@ -87,8 +87,8 @@
               },
               "nat.cpp": {
                 "type": "-",
-                "size": 23249,
-                "lmtime": 1544172251000,
+                "size": 23245,
+                "lmtime": 1544343599611,
                 "modified": false
               },
               ".main.cpp.swo": {
@@ -96,13 +96,19 @@
                 "size": 4096,
                 "lmtime": 1544172337018,
                 "modified": false
+              },
+              "main.cpp": {
+                "type": "-",
+                "size": 17376,
+                "lmtime": 1544338740491,
+                "modified": false
               }
             },
             "include": {
               "ip_mgr.h": {
                 "type": "-",
-                "size": 1191,
-                "lmtime": 1544172317404,
+                "size": 1237,
+                "lmtime": 1544172900020,
                 "modified": false
               },
               "nat.h": {
@@ -211,12 +217,6 @@
             "lmtime": 1540888536383,
             "modified": false
           },
-          "create_tun.sh": {
-            "type": "-",
-            "size": 324,
-            "lmtime": 1544172251016,
-            "modified": false
-          },
           "vendor": {
             "CMakeLists.txt": {
               "type": "-",
@@ -229,6 +229,83 @@
               "size": 1920396,
               "lmtime": 1544172251038,
               "modified": false
+            }
+          },
+          "build": {},
+          ".mgw.conf.swp": {
+            "type": "-",
+            "size": 4096,
+            "lmtime": 1544173584035,
+            "modified": false
+          },
+          "script": {
+            ".mgw.sh.swp": {
+              "type": "-",
+              "size": 4096,
+              "lmtime": 1544354256573,
+              "modified": false
+            },
+            ".ttgw.swp": {
+              "type": "-",
+              "size": 4096,
+              "lmtime": 1544345976517,
+              "modified": false
+            },
+            "mgw.sh": {
+              "type": "-",
+              "size": 2638,
+              "lmtime": 1544359892787,
+              "modified": false
+            },
+            "create_tun.sh": {
+              "type": "-",
+              "size": 324,
+              "lmtime": 1544354276796,
+              "modified": false
+            },
+            ".mgw.service.swp": {
+              "type": "-",
+              "size": 4096,
+              "lmtime": 1544358808092,
+              "modified": false
+            },
+            "mgw.service": {
+              "type": "-",
+              "size": 135,
+              "lmtime": 1544358892261,
+              "modified": false
+            },
+            "systemd": {
+              "mgw.service": {
+                "type": "-",
+                "size": 135,
+                "lmtime": 1544360675019,
+                "modified": false
+              },
+              "mgw.sh": {
+                "type": "-",
+                "size": 2638,
+                "lmtime": 1544360675020,
+                "modified": false
+              },
+              ".mgw.service.swp": {
+                "type": "-",
+                "size": 4096,
+                "lmtime": 1544360698349,
+                "modified": false
+              },
+              ".mgw.s.swp": {
+                "type": "-",
+                "size": 4096,
+                "lmtime": 1544360702439,
+                "modified": false
+              },
+              ".mgw.sh.swp": {
+                "type": "-",
+                "size": 4096,
+                "lmtime": 1544360705622,
+                "modified": false
+              }
             }
           }
         }

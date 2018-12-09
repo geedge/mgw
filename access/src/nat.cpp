@@ -333,10 +333,10 @@ static struct ip_port_pair * snat_value_get(struct nat_handle *handle, struct ip
         cand_ip_detail = (struct ip_mgr_cand_ip_detail *)MESA_htable_search(handle->cand_ip_detail_htable, (const unsigned char *)(&cand_ip), sizeof(cand_ip));
         FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_queyr_num, FS_OP_ADD, 1);
         char _ip[MGW_SYMBOL_MAX];
+        mgw_utils_inet_ntoa(cand_ip, _ip);
         if(cand_ip_detail == NULL)
         {
             FS_operate(fs_handle->handle, fs_handle->line_ip_detail, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
-            mgw_utils_inet_ntoa(cand_ip, _ip);
             MGW_LOG_ERROR(logger, "MESA_htable: table is %s, key %s not existed", "cand_ip_detail_htable", _ip);
             continue;
         }

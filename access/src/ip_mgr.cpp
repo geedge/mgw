@@ -142,9 +142,9 @@ static void Maat_user_policy_update_cb(int table_id, const char* table_line, voi
     int do_log;
     int action;
     int service_id;
-    printf("table line is %s\n", table_line);
+    //printf("table line is %s\n", table_line);
     sscanf(table_line, "%d %d %s %s %s %d %d %d %d", &config_id, &group_id, user_type, user_name, translate_param, &do_log, &action, &service_id, &is_valid);
-    printf("user name is %s\n", user_name);
+    //printf("user name is %s\n", user_name);
     struct user_policy_htable_value *value = ALLOC(struct user_policy_htable_value, 1);
     strncpy(value->user_name, user_name, MGW_SYMBOL_MAX);
     value->group_id = group_id;
