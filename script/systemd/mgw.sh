@@ -34,15 +34,15 @@ start_mgw() {
     [[ ${status} -eq 1 ]] && exit_msg "mgw is running"
    
     #set tap/tun
-    ip addr add ${TAP_ADDR} dev ${TAP_NAME} && \
-    ip tuntap add dev ${TUN_NAME} mode tun && \
-    ifconfig ${TUN_NAME} up && \
-    ip rule add iif ${TAP_NAME} tab 100 && \
-    ip route add default dev ${TUN_NAME} table 100 && \
-    echo 1 > /proc/sys/net/ipv4/ip_forward && \
-    echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter && \
+    ip addr add ${TAP_ADDR} dev ${TAP_NAME} 
+    ip tuntap add dev ${TUN_NAME} mode tun 
+    ifconfig ${TUN_NAME} up 
+    ip rule add iif ${TAP_NAME} tab 100 
+    ip route add default dev ${TUN_NAME} table 100 
+    echo 1 > /proc/sys/net/ipv4/ip_forward 
+    echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter 
     sysctl -w net.ipv4.conf.default.rp_filter=0 >> /dev/null
-    [[ $? -ne 0 ]] && exit_msg "failed at setup tap/tun"
+    #[[ $? -ne 0 ]] && exit_msg "failed at setup tap/tun"
     
     #start mgw
     [ ! -f "${ROOT_DIR}/mgw" ] && exit_msg "${ROOT_DIR}/mgw not existed"
@@ -58,7 +58,7 @@ start_mgw() {
             stop_mgw
             exit_msg "mgw has stopped"
         fi
-        sleep 5
+        sleep 3
     done
 }
 
@@ -73,6 +73,7 @@ check_mgw(){
 
 stop_mgw() {
     [ -f ${PID_FILE} ] && ps -hp $(cat ${PID_FILE}) >> /dev/null && kill -9 $(cat ${PID_FILE})
+    rm -f ${PID_FILE}
     #unset tap/tun
     ip addr del ${TAP_ADDR} dev ${TAP_NAME} >> /dev/null 2>&1 
     ip rule del iif ${TAP_NAME} tab 100 >> /dev/null 2>&1 

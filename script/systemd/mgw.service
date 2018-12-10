@@ -1,6 +1,6 @@
 [Service]
-ExecStart=/opt/mgw/script/mgw.sh start
-ExecStop=/opt/mgw/script/mgw.sh stop
+ExecStart=/bin/bash /opt/mgw/script/systemd/mgw.sh start
+ExecStop=/bin/bash /opt/mgw/script/systemd/mgw.sh stop
 Restart=always
 [Install]
 WantedBy=default.target
