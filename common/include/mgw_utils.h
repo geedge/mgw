@@ -18,13 +18,13 @@
 #define MGW_SYMBOL_MAX			64
 #define MGW_THREAD_MAX			128
 #define MGW_PACKET_MAX 3000
-#define HTABLE_QUERY_CB_SUCCESS 0
-#define HTABLE_QUERY_CB_FAILURE -1
-#define HTABLE_KEY_EXISTED 0
-#define HTABLE_KEY_NOT_EXISTED -1
-#define PROTO_TCP 0x06
-#define PROTO_UDP 0x11
-#define PROTO_ICMP 0x01
+#define MGW_HTABLE_QUERY_CB_SUCCESS 0
+#define MGW_HTABLE_QUERY_CB_FAILURE -1
+#define MGW_HTABLE_KEY_EXISTED 0
+#define MGW_HTABLE_KEY_NOT_EXISTED -1
+#define MGW_DROP 0    // something error, drop the packet
+#define MGW_BYPASS 1  // give others to handle
+#define MGW_FORWORD 2 // for snat: send to mrl,  for dnat: send to real server
 #define likely(expr)    __builtin_expect((expr), 1)
 #define unlikely(expr)  __builtin_expect((expr), 0)
 
@@ -50,22 +50,37 @@ MESA_htable_handle mgw_utils_create_htable(const char *profile, const char *sect
 struct field_stat_handle
 {
     screen_stat_handle_t handle;
-    int field_read_from_tun;
-    int field_write_to_tun;
-    int field_recv_from_mrl;
-    int field_send_to_mrl;
-    int cloumn_queyr_num;
+    int field_tun_read;
+    int field_tun_bypass;
+    int field_tun_write;
+    int field_rx_from_mrl;
+    int field_tx_to_mrl;
+    int cloumn_query_num;
     int cloumn_element_num;
     int cloumn_cache_hit;
     int cloumn_cache_miss;
-    int line_snat;
-    int line_dnat;
+    int line_snat_rx;
+    int line_snat_tx;
+    int line_dnat_rx;
+    int line_dnat_tx;
     int line_ip2user;
-    int line_user_policy;
-    int line_ip_group;
-    int line_ip_detail;
-    int snat_latency;
-    int dnat_latency;
+    int line_snat_policy;
+    int line_dnat_policy;
+    int line_snat_cand_ip;
+    int line_mrl_ip;
+    int snat_rx_latency;
+    int snat_tx_latency;
+    int dnat_rx_latency;
+    int dnat_tx_latency;
+};
+
+struct mgw_utils_sess
+{
+     uint32_t sip;
+     uint16_t sport;
+     uint32_t dip;
+     uint16_t dport;
+     uint8_t proto;
 };
 
 unsigned int mgw_utils_get_random(unsigned int num);
@@ -77,3 +92,11 @@ uint16_t mgw_utils_ip_checksum(const void *buff, size_t hdr_len);
 uint16_t mgw_utils_tcp_checksum(const void *buff, size_t len, in_addr_t src_addr, in_addr_t dest_addr);
 
 uint16_t mgw_utils_udp_checksum(const void *buff, size_t len, in_addr_t src_addr, in_addr_t dest_addr);
+
+int mgw_utils_pkt_sess_parse(const char *buff, int len, struct mgw_utils_sess *sess);
+
+int mgw_utils_pkt_sess_replace(const char *buff, int len, mgw_utils_sess *sess);
+
+void mgw_utils_fs_latency_cala(screen_stat_handle_t handle, struct timespec start_time, int field);
+
+int mgw_utils_sess_to_str(struct mgw_utils_sess *sess, char *sess_str);

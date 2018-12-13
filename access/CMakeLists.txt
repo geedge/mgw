@@ -1,4 +1,4 @@
-add_executable(mgw src/main.cpp src/vpn_monitor.cpp src/nat.cpp src/ip_mgr.cpp src/udp_server.cpp)
+add_executable(mgw src/main.cpp src/vpn_monitor.cpp src/snat.cpp src/dnat.cpp src/ip_mgr.cpp src/udp_server.cpp)
 
 target_include_directories(mgw PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 

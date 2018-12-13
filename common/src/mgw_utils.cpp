@@ -181,4 +181,114 @@ uint16_t mgw_utils_udp_checksum(const void *buff, size_t len, in_addr_t src_addr
 	// Return the one's complement of sum                           //
 	return ( (uint16_t)(~sum)  );
  }
- 
+
+ int mgw_utils_pkt_sess_parse(const char *buff, int len, struct mgw_utils_sess *sess)
+{
+    if(len < 20)
+    {
+        return -1;
+    }
+    struct iphdr *_iphdr = (struct iphdr *)buff;
+    int iphdr_len = _iphdr->ihl * 4;
+    sess->sip = _iphdr->saddr;
+    sess->dip = _iphdr->daddr;
+    sess->proto = _iphdr->protocol;
+    switch(sess->proto)
+    {
+        case IPPROTO_TCP:
+        {
+            if(len < 40)
+            {
+                return -1;
+            }
+            struct tcphdr *_tcphdr = (struct tcphdr *)(buff + iphdr_len);
+            sess->sport = _tcphdr->source;
+            sess->dport = _tcphdr->dest;
+            break;
+        }
+        case IPPROTO_UDP:
+        {
+            if(len < 28)
+            {
+                return -1;
+            }
+            struct udphdr *_udphdr = (struct udphdr *)(buff + iphdr_len);
+            sess->sport = _udphdr->source;
+            sess->dport = _udphdr->dest;
+            break;
+        }
+        case IPPROTO_ICMP:
+        {
+            if(len < 28)
+            {
+                return -1;
+            }
+            break;
+        }
+        default:
+            return -1;
+            break;
+    }
+    return 0;
+}
+
+int mgw_utils_pkt_sess_replace(const char *buff, int len, mgw_utils_sess *sess)
+{
+    struct iphdr *_iphdr = (struct iphdr *)buff;
+    uint16_t tot_len = ntohs(_iphdr->tot_len);
+    uint16_t iphdr_len = _iphdr->ihl * 4;
+    _iphdr->saddr = sess->sip;
+	_iphdr->daddr = sess->dip;
+    switch(_iphdr->protocol)
+    {
+        case IPPROTO_TCP:
+        {
+            struct tcphdr *_tcphdr = (struct tcphdr *)(buff + iphdr_len);
+            uint16_t tcp_len = tot_len - iphdr_len;
+            _tcphdr->source = sess->sport;
+			_tcphdr->dest = sess->dport;
+            _tcphdr->check = 0;
+            uint16_t tcp_checksum = mgw_utils_tcp_checksum(_tcphdr, tcp_len, _iphdr->saddr, _iphdr->daddr);
+            _tcphdr->check = tcp_checksum;
+            break;
+        }
+        case IPPROTO_UDP:
+        {
+            struct udphdr *_udphdr = (struct udphdr *)(buff + iphdr_len);
+            uint16_t udp_len = tot_len - iphdr_len;
+            _udphdr->source = sess->sport;
+			_udphdr->dest = sess->dport;
+            _udphdr->check = 0;
+            uint16_t udp_checksum = mgw_utils_udp_checksum(_udphdr, udp_len, _iphdr->saddr, _iphdr->daddr);
+            _udphdr->check = udp_checksum;
+            break;
+        }
+        case IPPROTO_ICMP:
+            break;
+        default:
+            break;
+    }
+    _iphdr->check = 0;
+    uint16_t ip_checksum  = mgw_utils_ip_checksum(buff, iphdr_len);
+    _iphdr->check = ip_checksum;
+    return 0;
+}
+
+void mgw_utils_fs_latency_cala(screen_stat_handle_t handle, struct timespec start_time, int field)
+{
+	struct timespec end_time;
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    long long cost_time;
+    cost_time = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_nsec - start_time.tv_nsec) / 1000;
+    FS_operate(handle, field, 0, FS_OP_SET, cost_time);
+}
+
+int mgw_utils_sess_to_str(struct mgw_utils_sess *sess, char *sess_str)
+{
+	char sip_str[MGW_SYMBOL_MAX];
+	char dip_str[MGW_SYMBOL_MAX];
+	mgw_utils_inet_ntoa(sess->sip, sip_str);
+	mgw_utils_inet_ntoa(sess->dip, dip_str);
+	snprintf(sess_str, MGW_SYMBOL_MAX, "<%d, %s:%d, %s:%d>", sess->proto, sip_str, ntohs(sess->sport), dip_str, ntohs(sess->dport));
+	return 0;
+}

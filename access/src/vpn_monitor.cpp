@@ -37,13 +37,12 @@ static long ip2user_cb_to_del_key(void *data, const uchar *key, uint size, void 
         if(rtn < 0)
         {
             MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, errno is %d, table is %s, key is %s", rtn, "ip2user_htable", _key);
-            return HTABLE_QUERY_CB_FAILURE;
+            return MGW_HTABLE_QUERY_CB_FAILURE;
         }
-        FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_element_num, FS_OP_ADD, -1);
         MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at del, table is %s, key is %s", "ip2user_htable", _key);
     }
     FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
-    return HTABLE_QUERY_CB_SUCCESS;
+    return MGW_HTABLE_QUERY_CB_SUCCESS;
 }
 
 
@@ -191,7 +190,7 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
             long cb_rtn = -1;
             uint32_t key = inet_addr(ip);
             MESA_htable_search_cb(handle->ip2user_htable, (const unsigned char *)(&key), sizeof(key), ip2user_cb_to_del_key, (void *)handle, &cb_rtn);
-            FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_queyr_num, FS_OP_ADD, 1);
+            FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_query_num, FS_OP_ADD, 1);
             int rtn = MESA_htable_add(handle->ip2user_htable, (const unsigned char *)(&key), sizeof(key), user_name);
             if(rtn < 0)
             {

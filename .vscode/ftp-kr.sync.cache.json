@@ -25,7 +25,7 @@
             "mgw.conf": {
               "type": "-",
               "size": 1869,
-              "lmtime": 1544358511216,
+              "lmtime": 1544440700496,
               "modified": false
             },
             ".mgw.conf.swp": {
@@ -70,7 +70,7 @@
               "vpn_monitor.cpp": {
                 "type": "-",
                 "size": 9247,
-                "lmtime": 1544360519242,
+                "lmtime": 1544438911926,
                 "modified": false
               },
               "udp_server.cpp": {
@@ -278,14 +278,14 @@
             "systemd": {
               "mgw.service": {
                 "type": "-",
-                "size": 135,
-                "lmtime": 1544360675019,
+                "size": 171,
+                "lmtime": 1544421988405,
                 "modified": false
               },
               "mgw.sh": {
                 "type": "-",
-                "size": 2638,
-                "lmtime": 1544360675020,
+                "size": 2633,
+                "lmtime": 1544422547180,
                 "modified": false
               },
               ".mgw.service.swp": {
@@ -306,6 +306,27 @@
                 "lmtime": 1544360705622,
                 "modified": false
               }
+            },
+            "rpm_build": {
+              "build_rpm.sh": {
+                "type": "-",
+                "size": 826,
+                "lmtime": 1544420024859,
+                "modified": false
+              },
+              "mgw.spec": {
+                "type": "-",
+                "size": 781,
+                "lmtime": 1544421599722,
+                "modified": false
+              },
+              "mgw-1.0.1.tar.gz": {
+                "type": "-",
+                "size": 1943051,
+                "lmtime": 0,
+                "modified": false
+              },
+              "RPMS": {}
             }
           }
         }
