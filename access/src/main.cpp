@@ -109,8 +109,8 @@ static struct field_stat_handle * fs_init(const char *profile, void *logger)
 
     snprintf(buff,sizeof(buff),"rx_succ_rate");
 	FS_register_ratio(handle,
-				fs_handle->field_rx_from_mrl,
 				fs_handle->field_tun_write,
+                fs_handle->field_rx_from_mrl,
 				1,
 				FS_STYLE_FIELD,
 				FS_CALC_CURRENT,

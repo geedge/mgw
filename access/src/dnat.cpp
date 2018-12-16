@@ -92,6 +92,7 @@ static long dnat_tx_htable_query_cb(void *data, const uchar *key, uint size, voi
 
 int dnat_tx_convert(struct dnat_handle *handle, char *buff, int len, uint32_t *mrl_ip)
 {
+    printf("dnat_tx_convert!\n");
     void *logger = handle->logger;
     //get session
     struct mgw_utils_sess *dnat_tx_key = ALLOC(struct mgw_utils_sess, 1);
@@ -119,7 +120,7 @@ int dnat_tx_convert(struct dnat_handle *handle, char *buff, int len, uint32_t *m
         mgw_utils_pkt_sess_replace(buff, len, &(dnat_tx_dup_value.sess));
         *mrl_ip = dnat_tx_dup_value.mrl_ip;
         mgw_utils_sess_to_str(&(dnat_tx_dup_value.sess), dnat_tx_value_str);
-        MGW_LOG_INFO(logger, "Succeed at dnat_rx_convert: %s ---> %s", dnat_tx_key_str, dnat_tx_value_str);
+        MGW_LOG_INFO(logger, "Succeed at dnat_tx_convert: %s ---> %s", dnat_tx_key_str, dnat_tx_value_str);
         return MGW_FORWORD;
     }
     FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_tx, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
@@ -168,8 +169,8 @@ int dnat_rx_convert(struct dnat_handle *handle, char *buff, int len)
     rtn = ip_mgr_dnat_policy_query(handle->_ip_mgr_handle, dnat_rx_key->dip, dnat_rx_key->dport, &trans_ip, &trans_port);
     if(rtn < 0)
     {
-        FREE(&dnat_rx_key);
         MGW_LOG_ERROR(logger, "Failed at dnat_rx_convert: policy not found, original dest is <%s, %d>", orig_ip_str, ntohs(dnat_rx_key->dport));
+        FREE(&dnat_rx_key);
         return MGW_DROP;
     }
     //query mrl_ip
@@ -177,8 +178,8 @@ int dnat_rx_convert(struct dnat_handle *handle, char *buff, int len)
     rtn = ip_mgr_mrl_ip_query(handle->_ip_mgr_handle, dnat_rx_key->dip, &mrl_ip);
     if(rtn < 0)
     {
-        FREE(&dnat_rx_key);
         MGW_LOG_ERROR(logger, "Failed at dnat_rx_convert: mrl_ip not found, original dest is <%s, %d>", orig_ip_str, ntohs(dnat_rx_key->dport));
+        FREE(&dnat_rx_key);
         return MGW_DROP;
     }
     //add to dnat_rx_table
@@ -207,7 +208,7 @@ int dnat_rx_convert(struct dnat_handle *handle, char *buff, int len)
     dnat_tx_key->sport = dnat_rx_value->dport;
     dnat_tx_key->proto = dnat_rx_value->proto;
     dnat_tx_key->dip = dnat_rx_value->sip;
-    dnat_tx_key->dport = dnat_rx_value->dport;
+    dnat_tx_key->dport = dnat_rx_value->sport;
     struct dnat_tx_htable_value *dnat_tx_value = ALLOC(struct dnat_tx_htable_value, 1);
     dnat_tx_value->sess.sip = dnat_rx_key->dip;
     dnat_tx_value->sess.sport = dnat_rx_key->dport;

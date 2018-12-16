@@ -18,28 +18,29 @@ struct vpn_monitor_handle
     char server_passwd[MGW_SYMBOL_MAX];
     struct hub_info hubs[MAX_HUB_NUM];
     int hub_num;
+    int polling_interval;
     MESA_htable_handle ip2user_htable;  // should be thread-safe
     struct field_stat_handle *fs_handle;
 };
 
 static long ip2user_cb_to_del_key(void *data, const uchar *key, uint size, void *user_arg)
 {
-    unsigned char _key[MGW_SYMBOL_MAX];
-    memcpy((char *)_key, key, size);
-    _key[size] = '\0';
+    uint32_t ip = *((uint32_t *)key);
+    char ip_str[MGW_SYMBOL_MAX];
+    mgw_utils_inet_ntoa(ip, ip_str);
     struct vpn_monitor_handle *handle = (struct vpn_monitor_handle *)user_arg;
     struct field_stat_handle *fs_handle = handle->fs_handle;
     if(data != NULL)
     {
         FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
-        MGW_LOG_INFO(handle->logger, "MESA_htable: key existed, table is %s, key is %s", "ip2user_htable", _key);
+        MGW_LOG_INFO(handle->logger, "MESA_htable: key existed, table is %s, ip is %s", "ip2user_htable", ip_str);
         int rtn = MESA_htable_del(handle->ip2user_htable, key, size, NULL);
         if(rtn < 0)
         {
-            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, errno is %d, table is %s, key is %s", rtn, "ip2user_htable", _key);
+            MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, errno is %d, table is %s, ip is %s", rtn, "ip2user_htable", ip_str);
             return MGW_HTABLE_QUERY_CB_FAILURE;
         }
-        MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at del, table is %s, key is %s", "ip2user_htable", _key);
+        MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at del, table is %s, ip is %s", "ip2user_htable", ip_str);
     }
     FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
     return MGW_HTABLE_QUERY_CB_SUCCESS;
@@ -58,6 +59,7 @@ static struct vpn_monitor_handle * vpn_monitor_init(void *args)
     char hub_list_str[MGW_STRING_MAX];
     MESA_load_profile_string_def(profile, section, "server_ip", handle->server_ip, sizeof(handle->server_ip), "localhost");
     MESA_load_profile_int_def(profile, section, "server_port", &(handle->server_port), 443);
+    MESA_load_profile_int_def(profile, section, "polling_interval", &(handle->polling_interval), 30);
     MESA_load_profile_string_def(profile, section, "server_passwd", handle->server_passwd, sizeof(handle->server_passwd), "111111");
     MESA_load_profile_string_def(profile, section, "hub_list", hub_list_str, sizeof(hub_list_str), "{NewHub0|111111}");
     MGW_LOG_INFO(handle->logger, "MESA_prof_load, [%s]:\n server_ip: %s\n server_port: %d\n server_passwd: %s\n hub_list: %s",
@@ -213,7 +215,7 @@ void * thread_vpn_monitor(void* args)
     {
         //printf("vpn monitor--------------\n");
         get_ip2user_by_vpncmd(handle);
-        sleep(60);
+        sleep(handle->polling_interval);
     }
     return NULL;
 }

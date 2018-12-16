@@ -141,8 +141,11 @@ int ip_mgr_dnat_policy_query(struct ip_mgr_handle *handle, uint32_t orig_ip, uin
     }
     *trans_ip = dup_value.trans_ip;
     *trans_port = dup_value.trans_port;
+    char trans_ip_str[MGW_SYMBOL_MAX];
+    mgw_utils_inet_ntoa(*trans_ip, trans_ip_str);
     FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
-    MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, original dest is <%s:%d>", "dnat_policy_htable", orig_ip_str, ntohs(orig_port));
+    MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, original dest is <%s:%d>, translated dest is <%s:%d>", 
+            "dnat_policy_htable", orig_ip_str, ntohs(orig_port), trans_ip_str, ntohs(*trans_port));
     return 0; 
 }
 
@@ -172,6 +175,7 @@ int ip_mgr_mrl_ip_query(struct ip_mgr_handle *handle, uint32_t back_ip, uint32_t
 
 static long snat_cand_ip_query_cb_get(void *data, const uchar *key, uint size, void *user_args)
 {
+    //printf("call snat_cand_ip_query_cb_get\n");
     struct snat_cand_ip_query_cb_get_args *args = (struct snat_cand_ip_query_cb_get_args *)user_args;
     struct ip_mgr_handle *handle = args->handle;
     void *logger = handle->logger;
@@ -206,21 +210,25 @@ int ip_mgr_snat_cand_ip_get(struct ip_mgr_handle *handle, const char *user_name,
 {
     void *logger = handle->logger;
     long cb_rtn = 0;
-    int group_id;
     int key_size = strnlen(user_name, MGW_SYMBOL_MAX);
     //query snat_policy
+    struct snat_policy_htable_value snat_policy_dup_value;
     MESA_htable_search_cb(handle->snat_policy_htable, (const unsigned char *)user_name, key_size, 
-            snat_policy_query_cb, &group_id, &cb_rtn);
+            snat_policy_query_cb, &snat_policy_dup_value, &cb_rtn);
     FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_policy, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
     if(cb_rtn == MGW_HTABLE_KEY_EXISTED)
     {
+        int group_id = snat_policy_dup_value.group_id;
         FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_policy, g_fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
-        MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, user_name is %s, group id is %d", "snat_policy", user_name, group_id);
+        MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, user_name is %s, group id is %d", 
+                    "snat_policy_htable", user_name, group_id);
         //query snat_cand_ip_htable
         long cb_rtn = -1;
         struct snat_cand_ip_query_cb_get_args args;
         args.handle = handle;
         args.ip = selected_ip;
+        args.group_id = group_id;
+        //printf("group id is %d\n", group_id);
         MESA_htable_search_cb(handle->snat_cand_ip_htable, (const unsigned char *)(&group_id), sizeof(group_id), 
             snat_cand_ip_query_cb_get, &args, &cb_rtn);
         FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_cand_ip, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
@@ -359,6 +367,7 @@ static void Maat_snat_cand_ip_start_cb(int update_type,void* args)
 
 static long snat_cand_ip_query_cb_add(void *data, const uchar *key, uint size, void *user_args)
 {
+    //printf("call snat_cand_ip_query_cb_add\n");
     struct snat_cand_ip_query_cb_add_args *args = (struct snat_cand_ip_query_cb_add_args *)user_args;
     struct ip_mgr_handle *handle = args->handle;
     int group_id = args->group_id;
@@ -411,6 +420,7 @@ static long snat_cand_ip_query_cb_add(void *data, const uchar *key, uint size, v
 
 static long snat_cand_ip_query_cb_del(void *data, const uchar *key, uint size, void *user_args)
 {
+    //printf("call snat_cand_ip_query_cb_del\n");
     struct snat_cand_ip_query_cb_del_args *args = (struct snat_cand_ip_query_cb_del_args *)user_args;
     struct ip_mgr_handle *handle = args->handle;
     uint32_t ip = args->ip;
@@ -489,7 +499,8 @@ static void Maat_snat_cand_ip_update_cb(int table_id, const char* table_line, vo
         args.ip_detail.addr_type = addr_type;
         args.ip_detail.location = location;
         long cb_rtn = -1;
-        MESA_htable_search_cb(handle->snat_cand_ip_htable, (const unsigned char *)(&group_id), sizeof(group_id), snat_cand_ip_query_cb_add, (void *)&args, &cb_rtn);
+        MESA_htable_search_cb(handle->snat_cand_ip_htable, (const unsigned char *)(&group_id), 
+                    sizeof(group_id), snat_cand_ip_query_cb_add, (void *)&args, &cb_rtn);
         FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_cand_ip, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
     }
     else
@@ -531,23 +542,27 @@ static void Maat_dnat_policy_update_cb(int table_id, const char* table_line, voi
     MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IP_DNAT_POLICY");
     int config_id, addr_type, orig_proto, do_log, action, service_id, is_valid;
     char orig_ip[MGW_SYMBOL_MAX];
-    int temp_orig_port;
+    char orig_port_str[MGW_SYMBOL_MAX];
     uint16_t orig_port;
     char trans_ip[MGW_SYMBOL_MAX];
-    int temp_trans_port;
+    char trans_port_str[MGW_SYMBOL_MAX];
     uint16_t trans_port;
-    //printf("table line is %s\n", table_line);
-    sscanf(table_line, "%d %d %s %d %d %s %d %d %d %d %d", &config_id, &addr_type, orig_ip, &temp_orig_port, &orig_proto, 
-                                trans_ip, &temp_trans_port, &do_log, &action, &service_id, &is_valid);
-    orig_port = (uint16_t)temp_orig_port;
-    trans_port = (uint16_t)temp_trans_port;
+    //printf("table is dnat_policy, table line is %s\n", table_line);
+    sscanf(table_line, "%d %d %s %s %d %s %s %d %d %d %d", &config_id, &addr_type, orig_ip, orig_port_str, 
+            &orig_proto,trans_ip, trans_port_str, &do_log, &action, &service_id, &is_valid);
+    orig_port = atoi(orig_port_str);
+    trans_port = atoi(trans_port_str);
     struct dnat_policy_htable_key *key = ALLOC(struct dnat_policy_htable_key, 1);
     key->orig_ip = inet_addr(orig_ip);
     key->orig_port = htons(orig_port);
+    //printf("service id is %d\n", service_id);
+    //printf("is valid is %d\n", is_valid);
     if(is_valid == 1)
     {
         //add dnat_policy_htable
         struct dnat_policy_htable_value *value = ALLOC(struct dnat_policy_htable_value, 1);
+        value->trans_ip = inet_addr(trans_ip);
+        value->trans_port = htons(trans_port);
         int rtn = MESA_htable_add(handle->dnat_policy_htable, (const unsigned char *)key, sizeof(key), (void *)value);
         if(rtn < 0)
         {
@@ -614,7 +629,6 @@ static void Maat_mrl_ip_update_cb(int table_id, const char* table_line, void* ar
     sscanf(table_line, "%d %s %d %s %d", &config_id, back_ip, &back_type, mrl_ip, &is_valid);
     if(is_valid == 1)
     {
-        //add snat_policy_htable
         struct mrl_ip_htable_value *value = ALLOC(struct mrl_ip_htable_value, 1);
         value->back_ip = key;
         value->mrl_ip = inet_addr(mrl_ip);
@@ -637,7 +651,6 @@ static void Maat_mrl_ip_update_cb(int table_id, const char* table_line, void* ar
     }
     else
     {
-        //del snat_policy_htable
         int rtn = MESA_htable_del(handle->mrl_ip_htable, (const unsigned char *)&key, sizeof(key), NULL);
         if(rtn < 0)
         {

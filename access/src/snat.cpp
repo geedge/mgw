@@ -29,7 +29,7 @@ static void snat_tx_htable_data_free_cb(void *data)
 
 static void dnat_rx_htable_data_free_cb(void *data)
 {
-    FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_rx, g_fs_handle->cloumn_element_num, FS_OP_ADD, -1);
+    FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_rx, g_fs_handle->cloumn_element_num, FS_OP_ADD, -1);
     FREE(&data);
 }
 
@@ -164,7 +164,7 @@ static struct snat_tx_htable_value * snat_tx_value_get(struct snat_handle *handl
         char snat_rx_key_str[MGW_SYMBOL_MAX];
         char snat_rx_value_str[MGW_SYMBOL_MAX];
         mgw_utils_sess_to_str(snat_rx_key, snat_rx_key_str);
-        mgw_utils_sess_to_str(snat_rx_key, snat_rx_value_str);
+        mgw_utils_sess_to_str(snat_rx_value, snat_rx_value_str);
         rtn = MESA_htable_add(handle->snat_rx_htable, (const unsigned char *)snat_rx_key, sizeof(struct mgw_utils_sess), (void *)snat_rx_value);
         FREE(&snat_rx_key);
         if(rtn < 0)
@@ -183,11 +183,11 @@ static struct snat_tx_htable_value * snat_tx_value_get(struct snat_handle *handl
                             "snat_rx_htable", snat_rx_key_str, snat_rx_value_str);
             FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_rx, g_fs_handle->cloumn_element_num, FS_OP_ADD, 1);
             struct snat_tx_htable_value *snat_tx_value = ALLOC(struct snat_tx_htable_value, 1);
-            snat_tx_value->sess.sip = snat_tx_key->sip;
-            snat_tx_value->sess.sport = snat_tx_key->sport;
+            snat_tx_value->sess.sip = cand_ip;
+            snat_tx_value->sess.sport = cand_port;
             snat_tx_value->sess.proto = snat_tx_key->proto;
-            snat_tx_value->sess.dip = cand_ip;
-            snat_tx_value->sess.dport = cand_port;
+            snat_tx_value->sess.dip = snat_tx_key->dip;
+            snat_tx_value->sess.dport = snat_tx_key->dport;
             snat_tx_value->mrl_ip = mrl_ip;
             return snat_tx_value;
         }
@@ -236,17 +236,17 @@ int snat_tx_convert(struct snat_handle *handle, char *buff, int len, uint32_t *m
     char snat_tx_key_sip_str[MGW_SYMBOL_MAX];
     mgw_utils_inet_ntoa(snat_tx_key_sip, snat_tx_key_sip_str);
     MESA_htable_search_cb(handle->ip2user_htable, (const unsigned char *)(&snat_tx_key_sip), sizeof(uint32_t), 
-                ip2user_htable_query_cb, (void *)(&dup_user_name), &cb_rtn);
+                ip2user_htable_query_cb, (void *)(dup_user_name), &cb_rtn);
     FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
     if(cb_rtn == MGW_HTABLE_KEY_NOT_EXISTED)
     {
         mgw_utils_inet_ntoa(snat_tx_key_sip, snat_tx_key_sip_str);
-        MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s, ip is %s", "ip2user", snat_tx_key_sip_str);
+        MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s, ip is %s", "ip2user_htable", snat_tx_key_sip_str);
         FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
         FREE(&snat_tx_key);
         return MGW_BYPASS;
     }
-    MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, ip is %s", "ip2user", snat_tx_key_sip_str);
+    MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, ip is %s, user is %s", "ip2user_htable", snat_tx_key_sip_str, dup_user_name);
     FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
     //get snat_tx_value
     struct snat_tx_htable_value *snat_tx_value = NULL;
@@ -260,6 +260,7 @@ int snat_tx_convert(struct snat_handle *handle, char *buff, int len, uint32_t *m
     //add to snat_tx_htable
     rtn = MESA_htable_add(handle->snat_tx_htable, (const unsigned char *)snat_tx_key, sizeof(struct mgw_utils_sess), (void *)snat_tx_value);
     FREE(&snat_tx_key);
+    mgw_utils_sess_to_str(&(snat_tx_value->sess), snat_tx_value_str);
     if(rtn < 0)
     {
         if(rtn != MESA_HTABLE_RET_DUP_ITEM)
@@ -330,10 +331,10 @@ int snat_rx_convert(struct snat_handle *handle, char *buff, int len)
         FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_rx, g_fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
         mgw_utils_pkt_sess_replace(buff, len, &snat_rx_dup_value);
         mgw_utils_sess_to_str(&snat_rx_dup_value, snat_rx_value_str);
-        MGW_LOG_INFO(logger, "Succeed at dnat_rx_convert: %s ---> %s", snat_rx_key_str, snat_rx_value_str);
+        MGW_LOG_INFO(logger, "Succeed at snat_rx_convert: %s ---> %s", snat_rx_key_str, snat_rx_value_str);
         return MGW_FORWORD;
     }
     FREE(&snat_rx_key);
-    FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_rx, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+    FS_operate(g_fs_handle->handle, g_fs_handle->line_snat_rx, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
     return MGW_BYPASS;
 }
