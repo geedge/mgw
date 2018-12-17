@@ -92,7 +92,7 @@ static long dnat_tx_htable_query_cb(void *data, const uchar *key, uint size, voi
 
 int dnat_tx_convert(struct dnat_handle *handle, char *buff, int len, uint32_t *mrl_ip)
 {
-    printf("dnat_tx_convert!\n");
+    //printf("dnat_tx_convert!\n");
     void *logger = handle->logger;
     //get session
     struct mgw_utils_sess *dnat_tx_key = ALLOC(struct mgw_utils_sess, 1);

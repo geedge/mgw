@@ -17,19 +17,12 @@ void wrapped_Maat_set_feather_opt(Maat_feather_t feather, enum MAAT_INIT_OPT typ
 Maat_feather_t Maat_init()
 {
     // load conf
-	const char *profile = "./conf/mgw.conf";
-    const char *section = "Maat";
-    char table_info_path[MGW_PATH_MAX];
-    int max_thread_num;
-    char Maat_redis_ip[MGW_STRING_MAX];
-    int Maat_redis_port;
-    char stat_file_path[MGW_PATH_MAX];
-    MESA_load_profile_string_def(profile, section, "table_info_path", table_info_path, sizeof(table_info_path), "./conf/table_info.conf");
-    MESA_load_profile_int_def(profile, section, "max_thread_num", &max_thread_num, 1);
-    MESA_load_profile_string_def(profile, section, "Maat_redis_ip", Maat_redis_ip, sizeof(Maat_redis_ip), "127.0.0.1");
-    MESA_load_profile_int_def(profile, section, "Maat_redis_port", &Maat_redis_port, 6379);
-    MESA_load_profile_string_def(profile, section, "stat_file_path", stat_file_path, sizeof(stat_file_path), "./log/Maat_stat.log");
-
+    char *table_info_path = "./conf/table_info.conf";
+    int max_thread_num = 1;
+    char *Maat_redis_ip = "192.168.11.243";
+    int Maat_redis_port = 6800;
+	int Maat_redis_index = 5;
+	
     // init Maat
     Maat_feather_t feather = NULL;
 	void *logger = MESA_create_runtime_log_handle("./log/test_maat_redis.log", RLOG_LV_DEBUG);
@@ -41,8 +34,8 @@ Maat_feather_t Maat_init()
     wrapped_Maat_set_feather_opt(feather, MAAT_OPT_INSTANCE_NAME, "mgw", strlen("mgw")+1);
 	wrapped_Maat_set_feather_opt(feather, MAAT_OPT_REDIS_IP, Maat_redis_ip, strlen(Maat_redis_ip)+1);
 	wrapped_Maat_set_feather_opt(feather, MAAT_OPT_REDIS_PORT, &Maat_redis_port, sizeof(Maat_redis_port));
-    wrapped_Maat_set_feather_opt(feather, MAAT_OPT_STAT_FILE_PATH, stat_file_path, strlen(stat_file_path)+1);
-    wrapped_Maat_set_feather_opt(feather, MAAT_OPT_STAT_ON, NULL, 0);
+    wrapped_Maat_set_feather_opt(feather, MAAT_OPT_REDIS_INDEX, &Maat_redis_index, sizeof(Maat_redis_index));
+	wrapped_Maat_set_feather_opt(feather, MAAT_OPT_STAT_ON, NULL, 0);
 	wrapped_Maat_set_feather_opt(feather, MAAT_OPT_PERF_ON, NULL, 0);
     //wrapped_Maat_set_feather_opt(feather, MAAT_OPT_SCANDIR_INTERVAL_MS,&scan_interval_ms, sizeof(scan_interval_ms));
 	//wrapped_Maat_set_feather_opt(feather, MAAT_OPT_EFFECT_INVERVAL_MS, &effective_interval_ms, sizeof(effective_interval_ms));
@@ -51,7 +44,7 @@ Maat_feather_t Maat_init()
 	int rtn = Maat_initiate_feather(feather);
     if(unlikely(rtn < 0))
     {
-        MGW_LOG_ERROR(logger, "Failed at Maat_initiate_feather");
+        printf("Failed at Maat_initiate_feather");
 		exit(EXIT_FAILURE);
     }
     return feather;
@@ -69,8 +62,8 @@ void Maat_test_set_cmd_line(Maat_feather_t feather)
 	{
 		line_rule[i].label_id=0;
 		//line_rule[i].rule_id=(int)Maat_cmd_incrby(feather,"TEST_PLUG_SEQ", 1);
-        line_rule[i].rule_id = 1;
-		line_rule[i].table_name="IR_POLICY";
+        line_rule[i].rule_id = 100;
+		line_rule[i].table_name="IR_NOMINEE_IP";
 		//1\t101\t0\tuser\t1
 		snprintf(table_line[i],sizeof(table_line[i]),"1\t1\t0\ttesting1\t1");
 		line_rule[i].table_line=table_line[i];

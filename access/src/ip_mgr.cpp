@@ -157,6 +157,7 @@ int ip_mgr_mrl_ip_query(struct ip_mgr_handle *handle, uint32_t back_ip, uint32_t
     char mrl_ip_str[MGW_SYMBOL_MAX];
     mgw_utils_inet_ntoa(back_ip, back_ip_str);
     struct mrl_ip_htable_value dup_value;
+    //printf("mrl_ip query: key is %d, size is %d\n", back_ip, sizeof(uint32_t));
     MESA_htable_search_cb(handle->mrl_ip_htable, (const unsigned char *)(&back_ip), sizeof(uint32_t), 
                         mrl_ip_query_cb, &dup_value, &cb_rtn);
     FS_operate(g_fs_handle->handle, g_fs_handle->line_mrl_ip, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
@@ -282,17 +283,19 @@ static void mrl_ip_htable_data_free_cb(void *data)
 
 static void Maat_snat_policy_start_cb(int update_type, void* args)
 {
+    printf("call Maat_snat_policy_start_cb, update_type is %d\n", update_type);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: start callback, table is IP_SNAT_POLICY");
+    MGW_LOG_INFO(logger, "Maat_redis: start callback, table is IP_SNAT_POLICY, update_type is %d\n", update_type);
 	return;
 }
 
 static void Maat_snat_policy_update_cb(int table_id, const char* table_line, void* args)
 {
+    printf("call Maat_snat_policy_update_cb, table_line is %s\n", table_line);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IP_SNAT_POLICY");
+    MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IP_SNAT_POLICY, table line is %s", table_line);
     int config_id, group_id, is_valid;
     char user_type[MGW_SYMBOL_MAX];
     char user_name[MGW_SYMBOL_MAX];
@@ -340,9 +343,10 @@ static void Maat_snat_policy_update_cb(int table_id, const char* table_line, voi
 
 static void Maat_snat_policy_finish_cb(void* args)
 {
+    printf("call Maat_snat_policy_finish_cb\n");
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: finish callback, table is snat_policy");
+    MGW_LOG_INFO(logger, "Maat_redis: finish callback, table is SNAT_POLICY");
     //Maat_feather_t feather = handle->feather;
     /*
 	long long version=0;
@@ -359,6 +363,7 @@ static void Maat_snat_policy_finish_cb(void* args)
 
 static void Maat_snat_cand_ip_start_cb(int update_type,void* args)
 {
+    printf("call Maat_snat_cand_ip_start_cb, update_type is %d\n", update_type);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
     MGW_LOG_INFO(logger, "Maat_redis: start callback, table is IR_CANDIDATE_IP, updata_type is %d\n", update_type);
@@ -481,9 +486,10 @@ static long snat_cand_ip_query_cb_del(void *data, const uchar *key, uint size, v
 
 static void Maat_snat_cand_ip_update_cb(int table_id, const char* table_line, void* args)
 {
+    printf("call Maat_snat_cand_ip_update_cb, table line is %s\n", table_line);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-	MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IR_CANDIDATE_IP");
+	MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IR_CANDIDATE_IP, table line is %s", table_line);
     int config_id, group_id, addr_type, location, is_valid;
     char ip_addr[MGW_SYMBOL_MAX];
     sscanf(table_line, "%d %d %d %s %d %d", &config_id, &group_id, &addr_type, ip_addr, &location, &is_valid);
@@ -520,6 +526,7 @@ static void Maat_snat_cand_ip_update_cb(int table_id, const char* table_line, vo
 
 static void Maat_snat_cand_ip_finish_cb(void* args)
 {
+    printf("call Maat_snat_cand_ip_finish_cb\n");
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
     MGW_LOG_INFO(logger, "Maat_redis: finish callback, table is CAND_IP_TABLE");
@@ -529,17 +536,19 @@ static void Maat_snat_cand_ip_finish_cb(void* args)
 
 static void Maat_dnat_policy_start_cb(int update_type, void* args)
 {
+    printf("call Maat_dnat_policy_start_cb, update_type is %d\n", update_type);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: start callback, table is IP_DNAT_POLICY");
+    MGW_LOG_INFO(logger, "Maat_redis: start callback, update_type is %d, table is IP_DNAT_POLICY", update_type);
 	return;
 }
 
 static void Maat_dnat_policy_update_cb(int table_id, const char* table_line, void* args)
 {
+    printf("call Maat_dnat_policy_update_cb, table line is %s\n", table_line);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IP_DNAT_POLICY");
+    MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IP_DNAT_POLICY, table line is %s", table_line);
     int config_id, addr_type, orig_proto, do_log, action, service_id, is_valid;
     char orig_ip[MGW_SYMBOL_MAX];
     char orig_port_str[MGW_SYMBOL_MAX];
@@ -602,6 +611,7 @@ static void Maat_dnat_policy_update_cb(int table_id, const char* table_line, voi
 
 static void Maat_dnat_policy_finish_cb(void* args)
 {
+    printf("call Maat_dnat_policy_finish_cb\n");
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
     MGW_LOG_INFO(logger, "Maat_redis: finish callback, table is IP_DNAT_POLICY");
@@ -610,28 +620,31 @@ static void Maat_dnat_policy_finish_cb(void* args)
 
 static void Maat_mrl_ip_start_cb(int update_type, void* args)
 {
+    printf("call Maat_mrl_ip_start_cb, update_type is %d\n", update_type);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: start callback, table is IP_MRL_IP_INFO");
+    MGW_LOG_INFO(logger, "Maat_redis: start callback, table is IP_MRL_IP_INFO, update_type is %d", update_type);
 	return;
 }
 
 static void Maat_mrl_ip_update_cb(int table_id, const char* table_line, void* args)
 {
+    printf("call Maat_mrl_ip_update_cb, table_line is %s\n", table_line);
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
-    MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IP_MRL_IP_INFO");
+    MGW_LOG_INFO(logger, "Maat_redis: update callback, table is IP_MRL_IP_INFO, table line is %s", table_line);
     int config_id, back_type, is_valid;
     char back_ip[MGW_SYMBOL_MAX];
     char mrl_ip[MGW_SYMBOL_MAX];
-    uint32_t key = inet_addr(back_ip);
     //printf("table line is %s\n", table_line);
     sscanf(table_line, "%d %s %d %s %d", &config_id, back_ip, &back_type, mrl_ip, &is_valid);
+    uint32_t key = inet_addr(back_ip);
     if(is_valid == 1)
     {
         struct mrl_ip_htable_value *value = ALLOC(struct mrl_ip_htable_value, 1);
         value->back_ip = key;
         value->mrl_ip = inet_addr(mrl_ip);
+        //printf("mrl_ip add : key is %d, size is %d\n", key, sizeof(key));
         int rtn = MESA_htable_add(handle->mrl_ip_htable, (const unsigned char *)&key, sizeof(key), (void *)value);
         if(rtn < 0)
         {
@@ -669,6 +682,7 @@ static void Maat_mrl_ip_update_cb(int table_id, const char* table_line, void* ar
 
 static void Maat_mrl_ip_finish_cb(void* args)
 {
+    printf("call Maat_mrl_ip_finish_cb\n");
     struct ip_mgr_handle *handle = (struct ip_mgr_handle *)args;
     void *logger = handle->logger;
     MGW_LOG_INFO(logger, "Maat_redis: finish callback, table is IP_MRL_IP_INFO");
