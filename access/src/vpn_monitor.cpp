@@ -178,7 +178,7 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
             uint32_t _ip = inet_network(ip);
             if(_ip == INADDR_NONE)
             {
-                MGW_LOG_ERROR(handle->logger, "Invalid dhcp_ip: %s", ip);
+                MGW_LOG_INFO(handle->logger, "Invalid dhcp_ip: %s", ip);
                 FREE(&user_name);
                 continue;
             }
