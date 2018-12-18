@@ -131,21 +131,38 @@ int ip_mgr_dnat_policy_query(struct ip_mgr_handle *handle, uint32_t orig_ip, uin
     struct dnat_policy_htable_value dup_value;
     MESA_htable_search_cb(handle->dnat_policy_htable, (const unsigned char *)key, sizeof(struct dnat_policy_htable_key), 
                         dnat_policy_query_cb, &dup_value, &cb_rtn);
-    FREE(&key);
     FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
     if(cb_rtn == MGW_HTABLE_KEY_NOT_EXISTED)
     {
         FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
         MGW_LOG_ERROR(logger, "MESA_htable: key not existed, table is %s, original dest is <%s:%d>", "dnat_policy_htable", orig_ip_str, ntohs(orig_port));
-        return -1;
+        //port=0
+        key->orig_port = 0;
+        MESA_htable_search_cb(handle->dnat_policy_htable, (const unsigned char *)key, sizeof(struct dnat_policy_htable_key), 
+                        dnat_policy_query_cb, &dup_value, &cb_rtn);
+        FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
+        if(cb_rtn == MGW_HTABLE_KEY_NOT_EXISTED)
+        {
+            FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+            MGW_LOG_ERROR(logger, "MESA_htable: key not existed, table is %s, original dest is <%s:%d>", "dnat_policy_htable", orig_ip_str, 0);
+            FREE(&key);
+            return -1;
+        }
+        FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
+        MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, original dest is <%s:%d>", "dnat_policy_htable", orig_ip_str, 0);
+        *trans_port = orig_port;
+    }
+    else
+    {
+        *trans_port = dup_value.trans_port;
     }
     *trans_ip = dup_value.trans_ip;
-    *trans_port = dup_value.trans_port;
     char trans_ip_str[MGW_SYMBOL_MAX];
     mgw_utils_inet_ntoa(*trans_ip, trans_ip_str);
     FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
     MGW_LOG_INFO(logger, "MESA_htable: key existed, table is %s, original dest is <%s:%d>, translated dest is <%s:%d>", 
             "dnat_policy_htable", orig_ip_str, ntohs(orig_port), trans_ip_str, ntohs(*trans_port));
+    FREE(&key);
     return 0; 
 }
 

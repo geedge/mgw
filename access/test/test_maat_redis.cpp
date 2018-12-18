@@ -17,9 +17,9 @@ void wrapped_Maat_set_feather_opt(Maat_feather_t feather, enum MAAT_INIT_OPT typ
 Maat_feather_t Maat_init()
 {
     // load conf
-    char *table_info_path = "./conf/table_info.conf";
+    char *table_info_path = (char *)"./conf/table_info.conf";
     int max_thread_num = 1;
-    char *Maat_redis_ip = "192.168.11.243";
+    char *Maat_redis_ip = (char *)"192.168.11.243";
     int Maat_redis_port = 6800;
 	int Maat_redis_index = 5;
 	
