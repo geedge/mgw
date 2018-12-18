@@ -1,5 +1,4 @@
-* 简介
-    * MGW是Matrix Gate Way的简称，是IP复用接入部分。
+# IP复用文档
 * 依赖
     * MESA_framework
         * .so放在/opt/MESA/lib下
@@ -51,6 +50,7 @@
                 * 一个{}内有4项，用空格分开, 分别为hub名称，hub密码，hub的dhcp分配的ip范围
             * polling_interval: vpn_monitor线程轮询间隔，默认为30s
         * [mrl]
+            * default_ip: mrl服务器ip
             * port: mrl服务器的端口
         * [udp_server]
             * ip: 和mrl通信监听的ip,默认为本机ip
@@ -79,3 +79,8 @@
             * systemctl stop mgw
             * journalctl -u mgw.service看下systemd日志
             * sh /opt/mgw/script/systemd/mgw.sh start手动执行脚本看看具体是哪里失败
+    * 包发送给mrl，没有收到回复，最可能的原因是复用的ip没有联网。
+
+
+
+
