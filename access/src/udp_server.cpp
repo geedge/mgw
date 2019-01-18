@@ -5,6 +5,8 @@
 #include "dnat.h"
 #include "mgw_tun.h"
 
+extern struct field_stat_handle *g_fs_handle;
+
 void * thread_udp_server(void *args)
 {
     struct udp_server_args *_args = (struct udp_server_args *)args;
@@ -13,7 +15,6 @@ void * thread_udp_server(void *args)
     struct snat_handle *_snat_handle = _args->_snat_handle;
     struct dnat_handle *_dnat_handle = _args->_dnat_handle;
     struct mgw_tun_handle *tun_handle = _args->tun_handle;
-    struct field_stat_handle *fs_handle = _args->fs_handle;
     FREE(&args);
     const char *section = "udp_server";
     char ip[MGW_SYMBOL_MAX];
@@ -45,11 +46,11 @@ void * thread_udp_server(void *args)
             MGW_LOG_ERROR(logger, "mgw_socket: Failed at recv udp data, errno is %d, %s", errno, strerror(errno));
             continue;
         }
-        FS_operate(fs_handle->handle, fs_handle->field_rx_from_mrl, 0, FS_OP_ADD, 1);
+        FS_operate(g_fs_handle->handle, g_fs_handle->field_rx_from_mrl, 0, FS_OP_ADD, 1);
         MGW_LOG_INFO(logger, "mgw_socket: Succeed to recv udp data, len is %d", len);
         clock_gettime(CLOCK_MONOTONIC, &start_time);
         int rtn = snat_rx_convert(_snat_handle, buff, len);
-        mgw_utils_fs_latency_cala(fs_handle->handle, start_time, fs_handle->snat_rx_latency);
+        mgw_utils_fs_latency_cala(g_fs_handle->handle, start_time, g_fs_handle->snat_rx_latency);
         if(rtn == MGW_DROP)
         {
             continue;
@@ -59,14 +60,14 @@ void * thread_udp_server(void *args)
             int rtn = mgw_tun_write(tun_handle, buff, len);
             if(rtn >0 && rtn == len)
             {
-                FS_operate(fs_handle->handle, fs_handle->field_tun_write, 0, FS_OP_ADD, 1);
+                FS_operate(g_fs_handle->handle, g_fs_handle->field_tun_write, 0, FS_OP_ADD, 1);
             }
             continue;
         }
         //MGW_BYPASS, dnat_rx_convert
         clock_gettime(CLOCK_MONOTONIC, &start_time);
         rtn = dnat_rx_convert(_dnat_handle, buff, len);
-        mgw_utils_fs_latency_cala(fs_handle->handle, start_time, fs_handle->dnat_rx_latency);
+        mgw_utils_fs_latency_cala(g_fs_handle->handle, start_time, g_fs_handle->dnat_rx_latency);
         if(rtn == MGW_DROP)
         {
             continue;
@@ -76,7 +77,7 @@ void * thread_udp_server(void *args)
             int rtn = mgw_tun_write(tun_handle, buff, len);
             if(rtn >0 && rtn == len)
             {
-                FS_operate(fs_handle->handle, fs_handle->field_tun_write, 0, FS_OP_ADD, 1);
+                FS_operate(g_fs_handle->handle, g_fs_handle->field_tun_write, 0, FS_OP_ADD, 1);
             }
             continue;
         }

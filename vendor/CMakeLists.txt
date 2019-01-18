@@ -2,8 +2,25 @@
 
 include(ExternalProject)
 
-### MESA Framework
+### IPLocator
+ExternalProject_Add(IPLocator
+        PREFIX IPLocator
+        URL ${CMAKE_CURRENT_SOURCE_DIR}/IPLocator-master.tar.gz
+        URL_MD5 685979caaa2b309221a21d5aab5e9cd5
+        CONFIGURE_COMMAND ./configure --prefix=<INSTALL_DIR> --disable-shared
+        BUILD_IN_SOURCE 1)
 
+ExternalProject_Get_Property(IPLocator INSTALL_DIR)
+file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+
+add_library(IPLocator-static STATIC IMPORTED GLOBAL)
+set_property(TARGET IPLocator-static PROPERTY IMPORTED_LOCATION ${INSTALL_DIR}/lib/libmaxminddb.a)
+set_property(TARGET IPLocator-static PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${INSTALL_DIR}/include)
+
+
+
+
+### MESA Framework
 set(MESA_FRAMEWORK_LIB_DIR /opt/MESA/lib)
 set(MESA_FRAMEWORK_INCLUDE_DIR /opt/MESA/include)
 

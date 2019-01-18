@@ -46,6 +46,7 @@ target_include_directories(test_htable PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
 target_link_libraries(test_htable common)
 target_link_libraries(test_htable pthread dl
+		IPLocator-static
 		MESA_handle_logger
 		MESA_prof_load
 		MESA_htable

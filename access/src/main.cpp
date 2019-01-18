@@ -30,11 +30,16 @@ struct mgw_handle
     MESA_htable_handle ip2user_htable;
 };
 
-static struct field_stat_handle *g_fs_handle = NULL;
+struct field_stat_handle *g_fs_handle = NULL;
 
 void ip2user_htable_data_free_cb(void *data)
 {
     FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_element_num, FS_OP_ADD, -1);
+    FREE(&data);
+}
+
+static void user2ips_htable_data_free_cb(void *data)
+{
     FREE(&data);
 }
 
@@ -117,8 +122,8 @@ static struct field_stat_handle * fs_init(const char *profile, void *logger)
 
     snprintf(buff,sizeof(buff),"tx_succ_rate");
 	FS_register_ratio(handle,
-				fs_handle->field_tun_read,
 				fs_handle->field_tx_to_mrl,
+				fs_handle->field_tun_read,
 				1,
 				FS_STYLE_FIELD,
 				FS_CALC_CURRENT,
@@ -126,25 +131,22 @@ static struct field_stat_handle * fs_init(const char *profile, void *logger)
     
 
     //column: cache hit/miss, line htable
-    snprintf(buff,sizeof(buff),"snat_rx");
-	fs_handle->line_snat_rx = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
+    snprintf(buff,sizeof(buff),"snat");
+	fs_handle->line_snat = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
 
-    snprintf(buff,sizeof(buff),"snat_tx");
-	fs_handle->line_snat_tx = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
-
-    snprintf(buff,sizeof(buff),"dnat_rx");
-	fs_handle->line_dnat_rx = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
-
-    snprintf(buff,sizeof(buff),"dnat_tx");
-	fs_handle->line_dnat_tx = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
+    snprintf(buff,sizeof(buff),"dnat");
+	fs_handle->line_dnat = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
 
     snprintf(buff,sizeof(buff),"ip2user");
 	fs_handle->line_ip2user = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
 
+    snprintf(buff,sizeof(buff),"user2ips");
+	fs_handle->line_user2ips = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
+
     snprintf(buff,sizeof(buff),"snat_policy");
 	fs_handle->line_snat_policy = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
 
-    snprintf(buff,sizeof(buff),"dnat_policy");
+    snprintf(buff,sizeof(buff),"dnat_policy"); 
 	fs_handle->line_dnat_policy = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff); 
 
     snprintf(buff,sizeof(buff),"snat_cand_ip");
@@ -197,7 +199,6 @@ static struct mgw_handle * mgw_init(char *conf_path)
     struct mgw_handle *_mgw_handle = ALLOC(struct mgw_handle, 1);
     char *profile = ALLOC(char, MGW_SYMBOL_MAX);
     strncpy(profile, conf_path, MGW_SYMBOL_MAX);
-    //printf("profile is %s\n", profile);
 	const char *section = "global";
 
     //init srand
@@ -226,7 +227,8 @@ static struct mgw_handle * mgw_init(char *conf_path)
     _mgw_handle->tun_handle = mgw_tun_init("tun_mgw", logger);
 
     //init ip_mgr
-    struct ip_mgr_handle * _ip_mgr_handle = ip_mgr_init(profile, fs_handle, logger);
+    MESA_htable_handle user2ips_htable = mgw_utils_create_htable(profile, "user2ips_htable", (void *)user2ips_htable_data_free_cb, NULL, logger);
+    struct ip_mgr_handle * _ip_mgr_handle = ip_mgr_init(profile, &user2ips_htable, logger);
     if(unlikely(_ip_mgr_handle == NULL))
     {
         MGW_LOG_ERROR(logger, "Failed at init_ip_mgr");
@@ -242,18 +244,18 @@ static struct mgw_handle * mgw_init(char *conf_path)
         exit(EXIT_FAILURE);
     }
     _mgw_handle->ip2user_htable = ip2user_htable;
-    _mgw_handle->_snat_handle = snat_init(profile, ip2user_htable, _ip_mgr_handle, fs_handle, logger);
+    _mgw_handle->_snat_handle = snat_init(profile, ip2user_htable, _ip_mgr_handle, logger);
 
     //init_dnat
-    _mgw_handle->_dnat_handle = dnat_init(profile, _ip_mgr_handle, fs_handle, logger);
+    _mgw_handle->_dnat_handle = dnat_init(profile, _ip_mgr_handle, logger);
 
     //create thread_vpn_monitor
     pthread_t thread_id;
     struct vpn_monitor_args *args = ALLOC(struct vpn_monitor_args, 1);
     args->ip2user_htable = ip2user_htable;
+    args->user2ips_htable_ptr = &user2ips_htable;
     args->logger = logger;
     args->profile = (const char *)profile;
-    args->fs_handle = fs_handle;
     int rtn = pthread_create(&thread_id, NULL, thread_vpn_monitor, (void *)args);
     if(unlikely(rtn != 0))
     {
@@ -268,7 +270,6 @@ static struct mgw_handle * mgw_init(char *conf_path)
     _udp_server_args->_snat_handle = _mgw_handle->_snat_handle;
     _udp_server_args->_dnat_handle = _mgw_handle->_dnat_handle;
     _udp_server_args->tun_handle = _mgw_handle->tun_handle;
-    _udp_server_args->fs_handle = fs_handle;
     rtn = pthread_create(&thread_id, NULL, thread_udp_server, (void *)_udp_server_args);
     if(unlikely(rtn != 0))
     {
@@ -315,23 +316,9 @@ static int send_data_to_mrl(struct udp_client_handle *handle, char *buff, int le
 
 static void mgw_run(struct mgw_handle *handle)
 {
-    //void *logger = handle->logger;
     struct timespec start_time;
-    /*for test
-    struct timespec start_time1;
-    clock_gettime(CLOCK_MONOTONIC, &start_time1);
-    for test */
     while(1)
     {
-        /* for test
-        struct timespec end_time;
-        clock_gettime(CLOCK_MONOTONIC, &end_time);
-        long long cost_time;
-        cost_time = end_time.tv_sec - start_time1.tv_sec;
-        printf("cost time is %d\n", cost_time);
-        if(cost_time > 600) break;
-        for test */
-
         char buff[MGW_PACKET_MAX];
         int len = mgw_tun_read(handle->tun_handle, buff, MGW_PACKET_MAX);
         if(len < 0)
@@ -349,20 +336,12 @@ static void mgw_run(struct mgw_handle *handle)
         }
         if(rtn == MGW_FORWORD)
         {
-            //for test
-            int rtn = mgw_tun_write(handle->tun_handle, buff, len);
-            if(rtn < 0 || rtn != len)
-            {
-                continue;
-            }
-            /* normal 
             int rtn = send_data_to_mrl(handle->_udp_client_handle, buff, len, mrl_ip);
             if(rtn > 0 && rtn == len)
             {
                 FS_operate(g_fs_handle->handle, g_fs_handle->field_tx_to_mrl, 0, FS_OP_ADD, 1);
             }
             continue;
-            */
         }
         // rtn=MGW_BYPASS, do sant_src_convert
         clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -388,7 +367,7 @@ static void mgw_run(struct mgw_handle *handle)
             continue;
         }
         FS_operate(g_fs_handle->handle, g_fs_handle->field_tun_bypass, 0, FS_OP_ADD, 1);
-        FS_operate(g_fs_handle->handle, g_fs_handle->field_tun_read, 0, FS_OP_ADD, -1);
+        //FS_operate(g_fs_handle->handle, g_fs_handle->field_tun_read, 0, FS_OP_ADD, -1);
     }
 }
 

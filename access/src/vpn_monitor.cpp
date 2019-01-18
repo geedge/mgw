@@ -7,12 +7,12 @@ struct hub_info
     char passwd[MGW_SYMBOL_MAX];
     unsigned int dhcp_begin_ip;
     unsigned int dhcp_end_ip;
-}hub_info_t;
-#define MAX_HUB_NUM 20
+};
 
 struct vpn_monitor_handle
 { 
     void *logger;
+    const char *profile;
     char server_ip[MGW_SYMBOL_MAX];
     int server_port;
     char server_passwd[MGW_SYMBOL_MAX];
@@ -20,8 +20,10 @@ struct vpn_monitor_handle
     int hub_num;
     int polling_interval;
     MESA_htable_handle ip2user_htable;  // should be thread-safe
-    struct field_stat_handle *fs_handle;
+    MESA_htable_handle *user2ips_htable_ptr;
 };
+
+extern struct field_stat_handle *g_fs_handle;
 
 static long ip2user_cb_to_del_key(void *data, const uchar *key, uint size, void *user_arg)
 {
@@ -29,21 +31,20 @@ static long ip2user_cb_to_del_key(void *data, const uchar *key, uint size, void 
     char ip_str[MGW_SYMBOL_MAX];
     mgw_utils_inet_ntoa(ip, ip_str);
     struct vpn_monitor_handle *handle = (struct vpn_monitor_handle *)user_arg;
-    struct field_stat_handle *fs_handle = handle->fs_handle;
     if(data != NULL)
     {
-        FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
+        FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_cache_hit, FS_OP_ADD, 1);
         MGW_LOG_INFO(handle->logger, "MESA_htable: key existed, table is %s, ip is %s", "ip2user_htable", ip_str);
         int rtn = MESA_htable_del(handle->ip2user_htable, key, size, NULL);
         if(rtn < 0)
         {
             MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at del, errno is %d, table is %s, ip is %s", rtn, "ip2user_htable", ip_str);
-            return MGW_HTABLE_QUERY_CB_FAILURE;
+            return 0;
         }
         MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at del, table is %s, ip is %s", "ip2user_htable", ip_str);
     }
-    FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
-    return MGW_HTABLE_QUERY_CB_SUCCESS;
+    FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
+    return 0;
 }
 
 
@@ -53,15 +54,15 @@ static struct vpn_monitor_handle * vpn_monitor_init(void *args)
     struct vpn_monitor_handle *handle = ALLOC(struct vpn_monitor_handle, 1);
     handle->logger = _args->logger;
     handle->ip2user_htable = _args->ip2user_htable;
-    handle->fs_handle = _args->fs_handle;
-    const char *profile = _args->profile;
+    handle->user2ips_htable_ptr = _args->user2ips_htable_ptr;
+    handle->profile = _args->profile;
     const char *section = "vpn_server";
     char hub_list_str[MGW_STRING_MAX];
-    MESA_load_profile_string_def(profile, section, "server_ip", handle->server_ip, sizeof(handle->server_ip), "localhost");
-    MESA_load_profile_int_def(profile, section, "server_port", &(handle->server_port), 443);
-    MESA_load_profile_int_def(profile, section, "polling_interval", &(handle->polling_interval), 30);
-    MESA_load_profile_string_def(profile, section, "server_passwd", handle->server_passwd, sizeof(handle->server_passwd), "111111");
-    MESA_load_profile_string_def(profile, section, "hub_list", hub_list_str, sizeof(hub_list_str), "{NewHub0|111111}");
+    MESA_load_profile_string_def(handle->profile, section, "server_ip", handle->server_ip, sizeof(handle->server_ip), "localhost");
+    MESA_load_profile_int_def(handle->profile, section, "server_port", &(handle->server_port), 443);
+    MESA_load_profile_int_def(handle->profile, section, "polling_interval", &(handle->polling_interval), 30);
+    MESA_load_profile_string_def(handle->profile, section, "server_passwd", handle->server_passwd, sizeof(handle->server_passwd), "111111");
+    MESA_load_profile_string_def(handle->profile, section, "hub_list", hub_list_str, sizeof(hub_list_str), "{NewHub0|111111}");
     MGW_LOG_INFO(handle->logger, "MESA_prof_load, [%s]:\n server_ip: %s\n server_port: %d\n server_passwd: %s\n hub_list: %s",
                  "vpn_server", handle->server_ip, handle->server_port, handle->server_passwd, hub_list_str);
     char *token;
@@ -69,7 +70,6 @@ static struct vpn_monitor_handle * vpn_monitor_init(void *args)
     handle->hub_num = 0;
     while((token = strtok_r(rest, ",", &rest)))
     {
-        //printf("token is %s\n", token);
         char hub_name[MGW_SYMBOL_MAX];
         char hub_passwd[MGW_SYMBOL_MAX];
         char dhcp_begin_ip[MGW_SYMBOL_MAX];
@@ -85,7 +85,6 @@ static struct vpn_monitor_handle * vpn_monitor_init(void *args)
         }
         handle->hubs[handle->hub_num].dhcp_begin_ip = _dhcp_begin_ip;
         unsigned int _dhcp_end_ip = inet_network(dhcp_end_ip);
-        //printf("_dhcp_end_ip is %d\n", _dhcp_end_ip);
         if(_dhcp_end_ip == INADDR_NONE)
         {
             MGW_LOG_ERROR(handle->logger, "Invalid dhcp_end_ip: %s", dhcp_end_ip);
@@ -105,16 +104,22 @@ static void * vpn_monitor_destroy(struct vpn_monitor_handle *handle)
 }
 */
 
+static void next_user2ips_htable_data_free_cb(void *data)
+{
+    FS_operate(g_fs_handle->handle, g_fs_handle->line_user2ips, g_fs_handle->cloumn_element_num, FS_OP_ADD, -1);
+    FREE(&data);
+}
+
 static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
 {
     const char *server_ip = handle->server_ip;
     int server_port = handle->server_port;
-    struct field_stat_handle *fs_handle = handle->fs_handle;
     const char *server_passwd = handle->server_passwd;
     char get_sessions_cmd[MGW_STRING_MAX];
     char get_iptables_cmd[MGW_STRING_MAX];
     char buff[MGW_STRING_MAX];
     int i;
+    MESA_htable_handle next_user2ips_htable = mgw_utils_create_htable(handle->profile, "user2ips_htable", (void *)next_user2ips_htable_data_free_cb, NULL, handle->logger);
     for(i = 0; i < handle->hub_num; i++)
     {
         const char *hub_name = handle->hubs[i].name;
@@ -127,7 +132,6 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
                     server_ip, server_port, server_passwd, hub_name, hub_passwd);
 
         //get_iptables_cmd
-        //printf("get_iptables_cmd: %s\n", get_iptables_cmd);
         FILE *get_iptables_fp = popen(get_iptables_cmd, "r");
         if(get_iptables_fp == NULL)
         {
@@ -151,7 +155,7 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
         }
         //ID,Session Name,IP Address,Created at,Updated at,Location
         //1549233234,SID-TESTING10-182,192.168.11.167,2018-11-05 15:02:30,2018-11-05 15:29:02,On 'localhost.localdomain'
-        //user_name不区分大小写，不能包含-，数据库中一律存小写
+        //username不区分大小写，不能包含-，数据库中一律存小写
         while(fgets(buff, MGW_STRING_MAX, get_iptables_fp))
         {
             char id[MGW_SYMBOL_MAX];
@@ -159,50 +163,81 @@ static void get_ip2user_by_vpncmd(struct vpn_monitor_handle *handle)
             char dhcp_ip[MGW_SYMBOL_MAX];
             sscanf(buff, "%[^,],%[^,],%[^,]", id, sess_name, dhcp_ip);
 
-            //get ip and user_name
-            char *user_name = ALLOC(char, MGW_SYMBOL_MAX);
-            sscanf(sess_name, "SID-%[^-]", user_name);
+            //get ip and username
+            char *username = ALLOC(char, MGW_SYMBOL_MAX);
+            sscanf(sess_name, "SID-%[^-]", username);
             //change to lower case
-            for(size_t i = 0; i < strnlen(user_name, MGW_SYMBOL_MAX); i ++)
+            for(size_t i = 0; i < strnlen(username, MGW_SYMBOL_MAX); i ++)
             {
-                if(user_name[i] >= 'A' && user_name[i] <= 'Z')
+                if(username[i] >= 'A' && username[i] <= 'Z')
                 {
-                    user_name[i] = user_name[i] - 'A' + 'a';
+                    username[i] = username[i] - 'A' + 'a';
                 }
             }
 
-            char ip[MGW_SYMBOL_MAX];
-            sscanf(dhcp_ip, "%s", ip);
+            char ip_str[MGW_SYMBOL_MAX];
+            sscanf(dhcp_ip, "%s", ip_str);
 
             //find ip in dhcp range
-            uint32_t _ip = inet_network(ip);
-            if(_ip == INADDR_NONE)
+            uint32_t ip = inet_addr(ip_str);
+            if(ip == INADDR_NONE)
             {
-                MGW_LOG_INFO(handle->logger, "Invalid dhcp_ip: %s", ip);
-                FREE(&user_name);
+                MGW_LOG_INFO(handle->logger, "Invalid dhcp_ip: %s", ip_str);
+                FREE(&username);
                 continue;
             }
-            if(_ip > dhcp_end_ip || _ip < dhcp_begin_ip)
+            if(ntohl(ip) > dhcp_end_ip || ntohl(ip) < dhcp_begin_ip)
             {
-                MGW_LOG_INFO(handle->logger, "Not in dhcp range, ip is %s", ip);
-                FREE(&user_name);
+                MGW_LOG_INFO(handle->logger, "Not in dhcp range, ip is %s", ip_str);
+                FREE(&username);
                 continue;
             }
             //set ip2user
             long cb_rtn = -1;
-            uint32_t key = inet_addr(ip);
-            MESA_htable_search_cb(handle->ip2user_htable, (const unsigned char *)(&key), sizeof(key), ip2user_cb_to_del_key, (void *)handle, &cb_rtn);
-            FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_query_num, FS_OP_ADD, 1);
-            int rtn = MESA_htable_add(handle->ip2user_htable, (const unsigned char *)(&key), sizeof(key), user_name);
+            MESA_htable_search_cb(handle->ip2user_htable, (const unsigned char *)(&ip), sizeof(ip), ip2user_cb_to_del_key, (void *)handle, &cb_rtn);
+            FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_query_num, FS_OP_ADD, 1);
+            int rtn = MESA_htable_add(handle->ip2user_htable, (const unsigned char *)(&ip), sizeof(ip), username);
             if(rtn < 0)
             {
-                MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at add, table is %s, key is %s, value is %s", "ip2user_htable", ip, user_name);
-                FREE(&user_name);
+                MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at add, table is %s, key is %s, value is %s, rtn is %d", "ip2user_htable", ip_str, username, rtn);
+                FREE(&username);
                 continue;
             }
-            FS_operate(fs_handle->handle, fs_handle->line_ip2user, fs_handle->cloumn_element_num, FS_OP_ADD, 1);
-            MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at add, table is %s, key is %s, value is %s", "ip2user_htable", ip, user_name);
-        }
+            FS_operate(g_fs_handle->handle, g_fs_handle->line_ip2user, g_fs_handle->cloumn_element_num, FS_OP_ADD, 1);
+            MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at add, table is %s, key is %s, value is %s", "ip2user_htable", ip_str, username);
+            //set temp_user2ips
+            int key_size = strnlen(username, MGW_SYMBOL_MAX);
+            struct user2ips_value *value = (struct user2ips_value *)MESA_htable_search(next_user2ips_htable, (const unsigned char *)username, key_size);
+            if(value == NULL)
+            {
+                value = (struct user2ips_value *)ALLOC(struct user2ips_value, 1);
+                value->num = 0;
+                int key_size = strnlen(username, MGW_SYMBOL_MAX);
+                int rtn = MESA_htable_add(next_user2ips_htable, (const unsigned char *)(username), key_size, value);
+                if(rtn < 0)
+                {
+                    MGW_LOG_ERROR(handle->logger, "MESA_htable: Failed at add, table is %s, key is %s, rtn is %d", "temp_user2ips_htable", username, rtn);
+                    FREE(&value);
+                    continue;
+                }
+                MGW_LOG_INFO(handle->logger, "MESA_htable: Succeed at add, table is %s, key is %s", "temp_user2ips_htable", username);
+                FS_operate(g_fs_handle->handle, g_fs_handle->line_user2ips, g_fs_handle->cloumn_element_num, FS_OP_ADD, 1);
+            }
+            int num = value->num;
+            if(num >= MAX_LOGIN_PER_USER)
+            {
+                MGW_LOG_ERROR(handle->logger, "Failed at add %s to ip list of user %s, reached the MAX_LOGIN_PER_USER(10)", ip_str, username);
+            }
+            else
+            {
+                value->ip_list[num] = ip;
+                value->num++;
+                MGW_LOG_INFO(handle->logger, "Succeed at add %s to ip list of user %s", ip_str, username);
+            }
+        } 
+        MESA_htable_handle current_user2ips_htable = *(handle->user2ips_htable_ptr);
+        *(handle->user2ips_htable_ptr) = next_user2ips_htable;
+        MESA_htable_destroy(current_user2ips_htable, NULL);
         fclose(get_iptables_fp);
     }
 }
@@ -213,7 +248,6 @@ void * thread_vpn_monitor(void* args)
     struct vpn_monitor_handle *handle = vpn_monitor_init(args);
     while(1)
     {
-        //printf("vpn monitor--------------\n");
         get_ip2user_by_vpncmd(handle);
         sleep(handle->polling_interval);
     }

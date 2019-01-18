@@ -1,6 +1,6 @@
 struct dnat_handle;
 
-struct dnat_handle * dnat_init(const char *profile, struct ip_mgr_handle *_ip_mgr_handle, struct field_stat_handle *fs_handle, void *logger);
+struct dnat_handle * dnat_init(const char *profile, struct ip_mgr_handle *_ip_mgr_handle, void *logger);
 
 void dnat_destroy(struct dnat_handle *handle);
 

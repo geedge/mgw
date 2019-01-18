@@ -18,8 +18,6 @@
 #define MGW_SYMBOL_MAX			64
 #define MGW_THREAD_MAX			128
 #define MGW_PACKET_MAX 3000
-#define MGW_HTABLE_QUERY_CB_SUCCESS 0
-#define MGW_HTABLE_QUERY_CB_FAILURE -1
 #define MGW_HTABLE_KEY_EXISTED 0
 #define MGW_HTABLE_KEY_NOT_EXISTED -1
 #define MGW_DROP 0    // something error, drop the packet
@@ -59,11 +57,10 @@ struct field_stat_handle
     int cloumn_element_num;
     int cloumn_cache_hit;
     int cloumn_cache_miss;
-    int line_snat_rx;
-    int line_snat_tx;
-    int line_dnat_rx;
-    int line_dnat_tx;
+    int line_snat;
+    int line_dnat;
     int line_ip2user;
+    int line_user2ips;
     int line_snat_policy;
     int line_dnat_policy;
     int line_snat_cand_ip;
