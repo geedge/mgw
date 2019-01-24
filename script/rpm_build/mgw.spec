@@ -42,6 +42,7 @@ systemctl enable mgw.service
 %postun
 rm /etc/systemd/system/mgw.service
 systemctl daemon-reload
+rm -rf /opt/mgw/
 
 %clean
 rm -rf $RPM_BUILD_DIR/*
