@@ -168,7 +168,7 @@ static int get_ip_by_user(MESA_htable_handle *user2ips_htable_ptr, char *trans_u
         if(cb_rtn == MGW_HTABLE_KEY_NOT_EXISTED)
         {
             FS_operate(g_fs_handle->handle, g_fs_handle->line_user2ips, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
-            MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s, user is %s", "user2ips_htable", trans_user_id);
+            MGW_LOG_ERROR(logger, "MESA_htable: key not existed, table is %s, user is %s", "user2ips_htable", trans_user_id);
             return -1;
         }
         else
@@ -178,7 +178,7 @@ static int get_ip_by_user(MESA_htable_handle *user2ips_htable_ptr, char *trans_u
             int num = dup_value.num;
             if(num <= 0)
             {
-                MGW_LOG_INFO(logger, "The ip number which logins as user %s is %d", trans_user_id, num);
+                MGW_LOG_ERROR(logger, "The ip number which logins as user %s is %d", trans_user_id, num);
                 return -1;
             }
             int index = mgw_utils_get_random(num);
@@ -207,7 +207,7 @@ int ip_mgr_dnat_policy_query(struct ip_mgr_handle *handle, uint32_t orig_ip, uin
     if(cb_rtn == MGW_HTABLE_KEY_NOT_EXISTED)
     {
         FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
-        MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s, original dest is <%d %s:%d>", "dnat_policy_htable", orig_proto, orig_ip_str, ntohs(orig_port));
+        //MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s, original dest is <%d %s:%d>", "dnat_policy_htable", orig_proto, orig_ip_str, ntohs(orig_port));
         //port=0
         key->orig_port = 0;
         MESA_htable_search_cb(handle->dnat_policy_htable, (const unsigned char *)key, sizeof(struct dnat_policy_htable_key), 
@@ -216,7 +216,7 @@ int ip_mgr_dnat_policy_query(struct ip_mgr_handle *handle, uint32_t orig_ip, uin
         if(cb_rtn == MGW_HTABLE_KEY_NOT_EXISTED)
         {
             FS_operate(g_fs_handle->handle, g_fs_handle->line_dnat_policy, g_fs_handle->cloumn_cache_miss, FS_OP_ADD, 1);
-            MGW_LOG_INFO(logger, "MESA_htable: key not existed, table is %s, original dest is <%d %s:%d>", "dnat_policy_htable", orig_proto, orig_ip_str, 0);
+            MGW_LOG_ERROR(logger, "MESA_htable: key not existed, table is %s, original dest is <%d %s: %d/%d>", "dnat_policy_htable", orig_proto, orig_ip_str, ntohs(orig_port), 0);
             FREE(&key);
             return -1;
         }
@@ -234,7 +234,7 @@ int ip_mgr_dnat_policy_query(struct ip_mgr_handle *handle, uint32_t orig_ip, uin
     int rtn = get_ip_by_user(handle->user2ips_htable_ptr, dup_value.trans_user_type, dup_value.trans_user_id, trans_ip_ptr, handle->logger);
     if(rtn < 0)
     {
-        MGW_LOG_INFO(logger, "Failed at get_ip_by_user, user_type is %s, user_id is %s", 
+        MGW_LOG_ERROR(logger, "Failed at get_ip_by_user, user_type is %s, user_id is %s", 
                 dup_value.trans_user_type, dup_value.trans_user_id);
         FREE(&key);
         return -1;
@@ -471,6 +471,7 @@ static void Maat_snat_policy_update_cb(int table_id, const char* table_line, voi
     }
     else
     {
+        FREE(&value);
         //del snat_policy_htable
         int rtn = MESA_htable_del(handle->snat_policy_htable, (const unsigned char *)user_name, key_size, NULL);
         if(rtn < 0)

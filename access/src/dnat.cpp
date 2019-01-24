@@ -135,10 +135,11 @@ int dnat_rx_convert(struct dnat_handle *handle, char *buff, int len)
     char trans_ip_str[MGW_SYMBOL_MAX];
     mgw_utils_inet_ntoa(dnat_rx_key->dip, orig_ip_str);
     //query dnat_policy
+    //MGW_LOG_ERROR(logger, "Try dnat_rx_convert: %s ---> %s, dip is %s", dnat_rx_key_str, "???", orig_ip_str);
     rtn = ip_mgr_dnat_policy_query(handle->_ip_mgr_handle, dnat_rx_key->dip, dnat_rx_key->dport, dnat_rx_key->proto, &trans_ip, &trans_port);
     if(rtn < 0)
     {
-        MGW_LOG_INFO(logger, "Failed at dnat_policy_query: original dest is <%s, %d>", orig_ip_str, ntohs(dnat_rx_key->dport));
+        MGW_LOG_ERROR(logger, "Failed at dnat_policy_query: original dest is <%s, %d>", orig_ip_str, ntohs(dnat_rx_key->dport));
         FREE(&dnat_rx_key);
         return MGW_DROP;
     }
